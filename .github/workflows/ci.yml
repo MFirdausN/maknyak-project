@@ -52,7 +52,13 @@ jobs:
       - name: Build runtime image
         run: docker build --tag maknyak-platform-runtime:latest .
       - name: Start stack
-        run: docker compose up --detach --wait --wait-timeout 300
+        run: |
+          if ! docker compose up --detach --wait --wait-timeout 300; then
+            docker compose ps --all
+            state="$(docker compose ps --all --format json | jq --compact-output --slurp '.')"
+            echo "::error title=Compose startup failed::${state}"
+            exit 1
+          fi
       - name: Verify migration replay
         run: docker compose run --rm migrate
       - name: Run end-to-end smoke test
