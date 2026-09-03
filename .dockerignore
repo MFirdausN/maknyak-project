@@ -1,0 +1,12 @@
+.git
+.agents
+.codex
+.env
+**/.next
+.pnpm-store
+.turbo
+**/dist
+**/node_modules
+coverage
+node_modules
+*.log

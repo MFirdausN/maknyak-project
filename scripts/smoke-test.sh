@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+compose_port() {
+  docker compose port "$1" "$2" | awk -F: 'END { print $NF }'
+}
+
+assert_health() {
+  local service="$1"
+  local port="$2"
+  local body
+  body="$(curl --fail --silent --show-error "http://localhost:${port}/api/v1/health")"
+  if [[ "$body" != *'"status":"ok"'* ]]; then
+    echo "${service} health response is not ok: ${body}" >&2
+    exit 1
+  fi
+  echo "ok: ${service} health"
+}
+
+gateway_port="$(compose_port gateway 3000)"
+identity_port="$(compose_port identity 3001)"
+workspace_port="$(compose_port workspace 3002)"
+dashboard_port="$(compose_port dashboard 3003)"
+
+assert_health gateway "$gateway_port"
+assert_health identity "$identity_port"
+assert_health workspace "$workspace_port"
+
+dashboard_status="$(curl --silent --output /dev/null --write-out '%{http_code}' "http://localhost:${dashboard_port}")"
+[[ "$dashboard_status" == "200" ]] || { echo "dashboard returned ${dashboard_status}" >&2; exit 1; }
+echo "ok: dashboard"
+
+unauthenticated_status="$(curl --silent --output /dev/null --write-out '%{http_code}' "http://localhost:${gateway_port}/api/v1/workspaces")"
+[[ "$unauthenticated_status" == "401" ]] || { echo "unauthenticated workspace request returned ${unauthenticated_status}" >&2; exit 1; }
+echo "ok: gateway rejects unauthenticated workspace access"
+
+internal_status="$(curl --silent --output /dev/null --write-out '%{http_code}' "http://localhost:${workspace_port}/api/v1/workspaces")"
+[[ "$internal_status" == "401" ]] || { echo "direct workspace request returned ${internal_status}" >&2; exit 1; }
+echo "ok: workspace rejects requests without service credentials"

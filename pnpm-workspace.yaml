@@ -1,0 +1,9 @@
+packages:
+  - applications/*
+  - platform/*
+  - services/*
+  - packages/*
+  - agents/*
+
+onlyBuiltDependencies:
+  - "@nestjs/core"
