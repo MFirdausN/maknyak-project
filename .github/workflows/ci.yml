@@ -34,6 +34,19 @@ jobs:
     needs: quality
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      GATEWAY_HOST_PORT: 13000
+      IDENTITY_HOST_PORT: 13001
+      WORKSPACE_HOST_PORT: 13002
+      DASHBOARD_HOST_PORT: 13003
+      KEYCLOAK_HOST_PORT: 18080
+      POSTGRES_HOST_PORT: 15432
+      REDIS_HOST_PORT: 16379
+      NATS_HOST_PORT: 14222
+      NATS_MONITOR_HOST_PORT: 18222
+      MINIO_HOST_PORT: 19000
+      MINIO_CONSOLE_HOST_PORT: 19001
+      OIDC_ISSUER: http://localhost:18080/realms/maknyak
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Build runtime image
