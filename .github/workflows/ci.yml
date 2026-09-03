@@ -47,6 +47,7 @@ jobs:
       MINIO_HOST_PORT: 19000
       MINIO_CONSOLE_HOST_PORT: 19001
       OIDC_ISSUER: http://localhost:18080/realms/maknyak
+      INTERNAL_API_KEY: ci-integration-only-not-a-secret
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Build runtime image
