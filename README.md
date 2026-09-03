@@ -1,6 +1,6 @@
 # Maknyak Platform
 
-Fondasi perusahaan software Maknyak Corp: platform multi-tenant yang menjadi rumah bagi layanan inti, kemampuan AI, agents, dan produk SaaS.
+Fondasi software Maknyak: platform multi-tenant yang menjadi rumah bagi layanan inti, kemampuan AI, agents, dan produk SaaS.
 
 ## Mulai cepat
 
