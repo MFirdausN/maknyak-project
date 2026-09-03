@@ -38,11 +38,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Build runtime image
         run: docker build --tag maknyak-platform-runtime:latest .
-      - name: Start and verify stack
-        run: |
-          docker compose up --detach --wait
-          docker compose run --rm migrate
-          make smoke
+      - name: Start stack
+        run: docker compose up --detach --wait --wait-timeout 300
+      - name: Verify migration replay
+        run: docker compose run --rm migrate
+      - name: Run end-to-end smoke test
+        run: make smoke
       - name: Print service logs on failure
         if: failure()
         run: docker compose logs --no-color
