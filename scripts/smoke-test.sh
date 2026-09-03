@@ -51,10 +51,24 @@ access_token="$(
 )"
 [[ -n "$access_token" ]] || { echo "OIDC did not return an access token" >&2; exit 1; }
 
-headers="$(curl --fail --silent --show-error --dump-header - --output /dev/null \
-  --header "authorization: Bearer ${access_token}" \
-  --header "x-request-id: smoke-authenticated" \
-  "http://localhost:${gateway_port}/api/v1/workspaces")"
+headers=""
+authenticated_status="000"
+for attempt in {1..10}; do
+  if headers="$(curl --silent --show-error --dump-header - --output /dev/null \
+    --write-out $'\n%{http_code}' \
+    --header "authorization: Bearer ${access_token}" \
+    --header "x-request-id: smoke-authenticated" \
+    "http://localhost:${gateway_port}/api/v1/workspaces")"; then
+    authenticated_status="$(tail -n 1 <<<"$headers")"
+    headers="$(sed '$d' <<<"$headers")"
+    [[ "$authenticated_status" == "200" ]] && break
+  fi
+  sleep 2
+done
+[[ "$authenticated_status" == "200" ]] || {
+  echo "authenticated workspace request returned ${authenticated_status}" >&2
+  exit 1
+}
 if ! grep -qi '^x-request-id: smoke-authenticated' <<<"$headers"; then
   echo "gateway did not preserve the correlation id" >&2
   exit 1
