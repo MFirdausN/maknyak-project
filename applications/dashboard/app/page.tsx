@@ -1,3 +1,5 @@
+import React from "react";
+
 const domains = [
   ["Identity", "Principal, session, authentication"],
   ["Workspace", "Tenant, member, role, project"],

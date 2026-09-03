@@ -8,12 +8,15 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import type { HealthResponse, ServiceInfo } from "@maknyak/contracts";
+import type { Pool } from "pg";
 import { z } from "zod";
 import { PrincipalId } from "./principal";
 import { WorkspaceService } from "./workspace.service";
 import type { Project, Workspace } from "./workspace.types";
+import { DATABASE } from "./database";
 
 const createWorkspaceSchema = z.object({
   slug: z
@@ -43,6 +46,7 @@ export const workspaceInfo: ServiceInfo = {
 export class WorkspaceController {
   constructor(
     @Inject(WorkspaceService) private readonly workspaces: WorkspaceService,
+    @Inject(DATABASE) private readonly database: Pool,
   ) {}
 
   @Get()
@@ -52,12 +56,30 @@ export class WorkspaceController {
 
   @Get("/health")
   health(): HealthResponse {
+    return this.liveness();
+  }
+
+  @Get("/health/live")
+  liveness(): HealthResponse {
     return {
       service: workspaceInfo.name,
       status: "ok",
       version: workspaceInfo.version,
       timestamp: new Date().toISOString(),
     };
+  }
+
+  @Get("/health/ready")
+  async readiness(): Promise<HealthResponse> {
+    try {
+      await this.database.query("SELECT 1");
+      return this.liveness();
+    } catch {
+      throw new ServiceUnavailableException({
+        ...this.liveness(),
+        status: "degraded",
+      });
+    }
   }
 
   @Get("/workspaces")

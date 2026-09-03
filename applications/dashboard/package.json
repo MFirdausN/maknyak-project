@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start -p 3003",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint app",
-    "test": "node --test"
+    "lint": "eslint app test",
+    "test": "node --import tsx --test test/*.test.tsx"
   },
   "dependencies": {
     "next": "^15.5.2",
@@ -19,6 +19,7 @@
     "@types/node": "^24.3.0",
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
+    "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }
 }

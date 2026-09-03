@@ -6,7 +6,7 @@ Roadmap berbasis outcome. Tanggal ditetapkan setelah kapasitas tim dan produk pe
 
 - [x] Monorepo, quality gates, local infrastructure, environment contract.
 - [x] Vision, architecture, domain map, dan ADR awal.
-- [ ] CI untuk install, lint, typecheck, test, build, dan secret scanning — workflow sudah tersedia; menunggu repository Git/GitHub dan hosted run pertama yang hijau.
+- [x] CI untuk install, lint, typecheck, test, build, secret scanning, dependency audit, dan Docker integration smoke.
 - [x] Baseline telemetry, preflight, smoke test, dan developer onboarding tervalidasi melalui rebuild storage bersih.
 
 Exit: contributor baru dapat menjalankan repository dan memahami batas domain dalam kurang dari 30 menit.

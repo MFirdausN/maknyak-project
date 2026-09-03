@@ -24,24 +24,58 @@ export function serviceConfig(service: "gateway" | "identity" | "workspace") {
     });
 }
 
-export const gatewayConfigSchema = baseSchema.extend({
-  GATEWAY_PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
-  IDENTITY_URL: z.string().url().default("http://localhost:3001"),
-  WORKSPACE_URL: z.string().url().default("http://localhost:3002"),
-  AUTH_MODE: z.enum(["oidc", "development"]).default("oidc"),
-  OIDC_ISSUER: z.string().url(),
-  OIDC_JWKS_URL: z.string().url(),
-  OIDC_CLIENT_ID: z.string().min(1),
-  INTERNAL_API_KEY: z.string().min(16),
-});
+export const gatewayConfigSchema = baseSchema
+  .extend({
+    GATEWAY_PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
+    IDENTITY_URL: z.string().url().default("http://localhost:3001"),
+    WORKSPACE_URL: z.string().url().default("http://localhost:3002"),
+    AUTH_MODE: z.enum(["oidc", "development"]).default("oidc"),
+    OIDC_ISSUER: z.string().url(),
+    OIDC_JWKS_URL: z.string().url(),
+    OIDC_CLIENT_ID: z.string().min(1),
+    INTERNAL_API_KEY: z.string().min(16),
+  })
+  .superRefine((config, context) => {
+    if (
+      config.NODE_ENV === "production" &&
+      config.INTERNAL_API_KEY === "change-this-in-every-environment"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["INTERNAL_API_KEY"],
+        message: "Placeholder service credentials are forbidden in production",
+      });
+    }
+    if (
+      config.NODE_ENV === "production" &&
+      config.AUTH_MODE === "development"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["AUTH_MODE"],
+        message: "Development authentication is forbidden in production",
+      });
+    }
+  });
 
 export const databaseConfigSchema = baseSchema.extend({
   DATABASE_URL: z.string().min(1),
 });
 
-export const internalServiceConfigSchema = z.object({
-  INTERNAL_API_KEY: z.string().min(16),
-});
+export const internalServiceConfigSchema = baseSchema
+  .extend({ INTERNAL_API_KEY: z.string().min(16) })
+  .superRefine((config, context) => {
+    if (
+      config.NODE_ENV === "production" &&
+      config.INTERNAL_API_KEY === "change-this-in-every-environment"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["INTERNAL_API_KEY"],
+        message: "Placeholder service credentials are forbidden in production",
+      });
+    }
+  });
 
 interface TelemetryRequest {
   method?: string;
@@ -77,6 +111,8 @@ export function requestTelemetry(service: string) {
     response.once("finish", () => {
       const durationMs =
         Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+      const rawPath = request.originalUrl ?? request.url ?? "/";
+      const path = rawPath.split(/[?#]/, 1)[0] || "/";
       process.stdout.write(
         `${JSON.stringify({
           timestamp: new Date().toISOString(),
@@ -85,7 +121,7 @@ export function requestTelemetry(service: string) {
           service,
           requestId,
           method: request.method ?? "UNKNOWN",
-          path: request.originalUrl ?? request.url ?? "/",
+          path,
           statusCode: response.statusCode,
           durationMs: Math.round(durationMs * 100) / 100,
         })}\n`,

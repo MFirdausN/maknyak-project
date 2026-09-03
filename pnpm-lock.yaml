@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  postcss: ">=8.5.23 <9"
+
 importers:
   .:
     devDependencies:
@@ -53,6 +56,9 @@ importers:
       "@types/react-dom":
         specifier: ^19.1.9
         version: 19.2.5(@types/react@19.2.18)
+      tsx:
+        specifier: ^4.20.5
+        version: 4.23.13
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
@@ -66,6 +72,9 @@ importers:
       "@types/node":
         specifier: ^24.3.0
         version: 24.13.3
+      tsx:
+        specifier: ^4.20.5
+        version: 4.23.13
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
@@ -3171,10 +3180,10 @@ packages:
       }
     engines: { node: ">=4" }
 
-  postcss@8.4.31:
+  postcss@8.5.26:
     resolution:
       {
-        integrity: sha512-PS08Iboia9mts/2ygV3eLpY5ghnUcfLV/EXTOW1E2qYxJKGGBUtNjN76FYHnMs36RmARn41bC0AZmn+rR0OVpQ==,
+        integrity: sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==,
       }
     engines: { node: ^10 || ^12 || >=14 }
 
@@ -5490,7 +5499,7 @@ snapshots:
       "@next/env": 15.5.25
       "@swc/helpers": 0.5.15
       caniuse-lite: 1.0.30001810
-      postcss: 8.4.31
+      postcss: 8.5.26
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
       styled-jsx: 5.1.6(react@19.2.8)
@@ -5631,7 +5640,7 @@ snapshots:
 
   pluralize@8.0.0: {}
 
-  postcss@8.4.31:
+  postcss@8.5.26:
     dependencies:
       nanoid: 3.3.18
       picocolors: 1.1.1

@@ -36,6 +36,7 @@ make dev       # aplikasi lokal dengan hot reload; infrastructure tetap di Docke
 make ai-up     # tambah Qdrant dan Ollama
 make down
 make check     # lint, typecheck, test, build
+pnpm security:audit
 make smoke     # verifikasi stack Docker yang sedang berjalan
 make disk-audit
 sudo make disk-clean
@@ -67,9 +68,11 @@ Gateway memverifikasi signature, issuer, expiry, dan client token melalui JWKS K
 
 ## Telemetry baseline
 
-Gateway, Identity, dan Workspace menulis satu log JSON untuk setiap request selesai. Log memuat service, `x-request-id`, method, path, status, dan latency; header authorization dan body tidak dicatat. Gateway meneruskan correlation ID yang sama ke Workspace. Client boleh mengirim `x-request-id` yang aman atau platform akan membuat UUID baru.
+Gateway, Identity, dan Workspace menulis satu log JSON untuk setiap request selesai. Log memuat service, `x-request-id`, method, pathname tanpa query string, status, dan latency; header authorization dan body tidak dicatat. Gateway meneruskan correlation ID yang sama ke Identity dan Workspace. Client boleh mengirim `x-request-id` yang aman atau platform akan membuat UUID baru.
 
-Migration SQL dijalankan oleh one-shot container `migrate` sebelum Identity dan Workspace dimulai. File migration bersifat idempotent dan berada di `infrastructure/postgres/init`.
+Setiap service menyediakan `/api/v1/health/live` untuk liveness dan `/api/v1/health/ready` untuk dependency-aware readiness. Endpoint `/api/v1/health` dipertahankan sebagai alias liveness.
+
+Migration SQL dijalankan oleh one-shot container `migrate` sebelum Identity dan Workspace dimulai. Ledger `platform.schema_migrations` menyimpan nama dan checksum setiap migration; perubahan terhadap migration yang sudah diterapkan akan menggagalkan startup. File migration berada di `infrastructure/postgres/init` dan dijalankan dalam transaksi.
 
 Mulai dari [visi](docs/VISION.md), lalu baca [arsitektur](docs/ARCHITECTURE.md), [domain](docs/DOMAINS.md), dan [roadmap](docs/ROADMAP.md). Keputusan penting dicatat sebagai ADR di `docs/decisions`.
 

@@ -35,7 +35,11 @@ export class AuthenticationGuard implements CanActivate {
       this.config.AUTH_MODE === "development"
         ? this.developmentPrincipal(request)
         : await this.oidcPrincipal(request);
-    await this.syncPrincipal(principal);
+    const requestId = request.headers["x-request-id"];
+    await this.syncPrincipal(
+      principal,
+      typeof requestId === "string" ? requestId : "unknown",
+    );
     request.principal = principal;
     return true;
   }
@@ -105,6 +109,7 @@ export class AuthenticationGuard implements CanActivate {
 
   private async syncPrincipal(
     principal: AuthenticatedPrincipal,
+    requestId: string,
   ): Promise<void> {
     try {
       const response = await fetch(
@@ -114,6 +119,7 @@ export class AuthenticationGuard implements CanActivate {
           headers: {
             "content-type": "application/json",
             "x-internal-api-key": this.config.INTERNAL_API_KEY,
+            "x-request-id": requestId,
           },
           body: JSON.stringify(principal),
           signal: AbortSignal.timeout(3_000),
