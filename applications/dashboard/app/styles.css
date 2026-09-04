@@ -366,6 +366,41 @@ button.danger {
   grid-template-columns: 1fr 1fr;
   margin-top: 20px;
 }
+
+.usage-meter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.usage-meter span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  padding: 0.3rem 0.6rem;
+}
+
+.brief-rating {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.brief-rating button {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  color: var(--muted);
+  min-width: 1.75rem;
+  padding: 0.2rem;
+}
+
+.brief-rating button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #111;
+}
 .brief-idea,
 .brief-form > button {
   grid-column: 1 / -1;

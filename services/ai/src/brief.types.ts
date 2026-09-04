@@ -9,6 +9,18 @@ export interface BriefResult {
   nextSteps: string[];
 }
 
+export interface BriefEvaluation {
+  score: number;
+  checks: Record<string, boolean>;
+  evaluator: "structural-v1";
+}
+
+export interface BriefFeedback {
+  rating: number;
+  comment?: string;
+  updatedAt: string;
+}
+
 export interface Brief {
   id: string;
   workspaceId: string;
@@ -17,6 +29,8 @@ export interface Brief {
   idea: string;
   modelId: string;
   result: BriefResult;
+  evaluation: BriefEvaluation | null;
+  feedback: BriefFeedback | null;
   createdAt: string;
 }
 
@@ -26,6 +40,14 @@ export interface BriefPage {
   pageSize: number;
   total: number;
   totalPages: number;
+}
+
+export interface UsageSummary {
+  runsToday: number;
+  dailyRunLimit: number;
+  running: number;
+  maxConcurrentRuns: number;
+  retentionDays: number;
 }
 
 export interface GenerateBriefInput {

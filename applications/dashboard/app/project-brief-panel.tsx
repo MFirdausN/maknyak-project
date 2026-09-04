@@ -19,7 +19,17 @@ interface Brief {
   title: string;
   modelId: string;
   result: BriefResult;
+  evaluation: { score: number; evaluator: string } | null;
+  feedback: { rating: number; comment?: string; updatedAt: string } | null;
   createdAt: string;
+}
+
+interface UsageSummary {
+  runsToday: number;
+  dailyRunLimit: number;
+  running: number;
+  maxConcurrentRuns: number;
+  retentionDays: number;
 }
 
 interface BriefPage {
@@ -54,6 +64,7 @@ export function ProjectBriefPanel({
   const [models, setModels] = useState<Model[]>([]);
   const [generating, setGenerating] = useState(false);
   const [streamed, setStreamed] = useState("");
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -65,10 +76,16 @@ export function ProjectBriefPanel({
     const refresh = async () => {
       if (document.visibilityState === "hidden") return;
       try {
-        const next = await request<BriefPage>(
-          `/api/ai/briefs?workspaceId=${workspaceId}&page=${page}`,
-        );
-        if (active) setData(next);
+        const [next, nextUsage] = await Promise.all([
+          request<BriefPage>(
+            `/api/ai/briefs?workspaceId=${workspaceId}&page=${page}`,
+          ),
+          request<UsageSummary>(`/api/ai/usage?workspaceId=${workspaceId}`),
+        ]);
+        if (active) {
+          setData(next);
+          setUsage(nextUsage);
+        }
       } catch (error) {
         if (active) onError(error);
       }
@@ -128,11 +145,38 @@ export function ProjectBriefPanel({
           `/api/ai/briefs?workspaceId=${workspaceId}&page=1`,
         ),
       );
+      setUsage(
+        await request<UsageSummary>(`/api/ai/usage?workspaceId=${workspaceId}`),
+      );
       onSuccess("Project brief berhasil dibuat.");
     } catch (error) {
       onError(error);
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function rate(briefId: string, rating: number) {
+    try {
+      await mutate(`/api/ai/briefs/${briefId}/feedback`, "PUT", { rating });
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.map((brief) =>
+                brief.id === briefId
+                  ? {
+                      ...brief,
+                      feedback: { rating, updatedAt: new Date().toISOString() },
+                    }
+                  : brief,
+              ),
+            }
+          : current,
+      );
+      onSuccess("Penilaian brief tersimpan.");
+    } catch (error) {
+      onError(error);
     }
   }
 
@@ -145,6 +189,17 @@ export function ProjectBriefPanel({
         </div>
         <span>{data?.total ?? 0} brief</span>
       </div>
+      {usage && (
+        <div className="usage-meter" aria-label="Pemakaian AI hari ini">
+          <span>
+            {usage.runsToday}/{usage.dailyRunLimit} generasi hari ini
+          </span>
+          <span>
+            {usage.running}/{usage.maxConcurrentRuns} sedang berjalan
+          </span>
+          <span>Retensi {usage.retentionDays} hari</span>
+        </div>
+      )}
       <form onSubmit={generate} className="brief-form">
         <label>
           Judul
@@ -185,6 +240,8 @@ export function ProjectBriefPanel({
               <th>Judul</th>
               <th>Ringkasan</th>
               <th>Model</th>
+              <th>Kualitas</th>
+              <th>Feedback</th>
               <th>Dibuat</th>
             </tr>
           </thead>
@@ -220,6 +277,29 @@ export function ProjectBriefPanel({
                   </details>
                 </td>
                 <td>{brief.modelId}</td>
+                <td>
+                  {brief.evaluation ? `${brief.evaluation.score}/100` : "–"}
+                </td>
+                <td>
+                  <div
+                    className="brief-rating"
+                    aria-label={`Nilai ${brief.title}`}
+                  >
+                    {[1, 2, 3, 4, 5].map((rating) => (
+                      <button
+                        key={rating}
+                        type="button"
+                        className={
+                          brief.feedback?.rating === rating ? "active" : ""
+                        }
+                        onClick={() => void rate(brief.id, rating)}
+                        aria-label={`${rating} dari 5`}
+                      >
+                        {rating}
+                      </button>
+                    ))}
+                  </div>
+                </td>
                 <td>{new Date(brief.createdAt).toLocaleString("id-ID")}</td>
               </tr>
             ))}
@@ -268,6 +348,20 @@ function BriefSection({ title, items }: { title: string; items: string[] }) {
 
 async function request<T>(url: string): Promise<T> {
   const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) throw await responseError(response);
+  return (await response.json()) as T;
+}
+
+async function mutate<T>(
+  url: string,
+  method: "PUT",
+  body: unknown,
+): Promise<T> {
+  const response = await fetch(url, {
+    method,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
   if (!response.ok) throw await responseError(response);
   return (await response.json()) as T;
 }

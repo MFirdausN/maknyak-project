@@ -50,11 +50,39 @@ page="$(request "$owner_token" GET "/ai/briefs?workspaceId=${workspace_id}&page=
 [[ "$(json_field total <<<"$page")" == "1" && "$(json_field pageSize <<<"$page")" == "10" ]] || { echo "brief pagination contract failed: ${page}" >&2; exit 1; }
 echo "ok: brief history uses tenant-scoped pagination of 10"
 
+brief_id="$(node -e 'let i="";process.stdin.on("data",c=>i+=c);process.stdin.on("end",()=>process.stdout.write(JSON.parse(i).items[0].id))' <<<"$page")"
+score="$(node -e 'let i="";process.stdin.on("data",c=>i+=c);process.stdin.on("end",()=>process.stdout.write(String(JSON.parse(i).items[0].evaluation.score)))' <<<"$page")"
+[[ "$score" -gt 0 ]] || { echo "brief evaluation score missing" >&2; exit 1; }
+echo "ok: deterministic quality evaluation is persisted"
+
+feedback="$(request "$owner_token" PUT "/ai/briefs/${brief_id}/feedback" '{"rating":5}')"
+[[ "$(json_field rating <<<"$feedback")" == "5" ]] || { echo "feedback was not stored" >&2; exit 1; }
+echo "ok: authenticated workspace feedback is stored"
+
+usage="$(request "$owner_token" GET "/ai/usage?workspaceId=${workspace_id}")"
+[[ "$(json_field runsToday <<<"$usage")" == "1" && "$(json_field dailyRunLimit <<<"$usage")" == "50" ]] || { echo "usage summary failed: ${usage}" >&2; exit 1; }
+echo "ok: daily usage budget is visible"
+
+docker compose exec -T postgres psql --quiet -U "${POSTGRES_USER:-maknyak}" -d "${POSTGRES_DB:-maknyak}" \
+  --command "INSERT INTO ai.workspace_limits (workspace_id, daily_run_limit) VALUES ('${workspace_id}', 1) ON CONFLICT (workspace_id) DO UPDATE SET daily_run_limit = 1;" >/dev/null
+limited="$(request "$owner_token" POST /ai/briefs/stream "$payload")"
+[[ "$limited" == *'event: error'* && "$limited" == *'Daily AI generation limit reached'* ]] || {
+  echo "daily AI budget was not enforced: ${limited}" >&2
+  exit 1
+}
+echo "ok: daily budget rejects excess generation"
+
 [[ "$(status "$outsider_token" GET "/ai/briefs?workspaceId=${workspace_id}&page=1")" == "403" ]] || {
   echo "unrelated principal accessed tenant AI briefs" >&2
   exit 1
 }
 echo "ok: unrelated principal cannot access tenant AI data"
+
+[[ "$(status "$outsider_token" PUT "/ai/briefs/${brief_id}/feedback" '{"rating":1}')" == "403" ]] || {
+  echo "unrelated principal submitted tenant AI feedback" >&2
+  exit 1
+}
+echo "ok: unrelated principal cannot submit tenant feedback"
 
 run_count="$(docker compose exec -T postgres psql --tuples-only --no-align -U "${POSTGRES_USER:-maknyak}" -d "${POSTGRES_DB:-maknyak}" --command "SELECT count(*) FROM ai.runs WHERE workspace_id = '${workspace_id}' AND status = 'succeeded' AND latency_ms IS NOT NULL;")"
 [[ "$run_count" == "1" ]] || { echo "AI usage run was not recorded" >&2; exit 1; }

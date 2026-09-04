@@ -4,6 +4,8 @@ import {
   Get,
   HttpException,
   Post,
+  Put,
+  Param,
   Query,
   Res,
   UseGuards,
@@ -61,6 +63,37 @@ export class AiProxyController {
     return this.forward("/briefs", "POST", principal.id, requestId, body);
   }
 
+  @Get("/usage")
+  usage(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @CurrentRequestId() requestId: string,
+    @Query() query: Record<string, string>,
+  ) {
+    const search = new URLSearchParams(query).toString();
+    return this.forward(
+      `/usage${search ? `?${search}` : ""}`,
+      "GET",
+      principal.id,
+      requestId,
+    );
+  }
+
+  @Put("/briefs/:briefId/feedback")
+  feedback(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @CurrentRequestId() requestId: string,
+    @Param("briefId") briefId: string,
+    @Body() body: unknown,
+  ) {
+    return this.forward(
+      `/briefs/${encodeURIComponent(briefId)}/feedback`,
+      "PUT",
+      principal.id,
+      requestId,
+      body,
+    );
+  }
+
   @Post("/briefs/stream")
   async stream(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
@@ -96,7 +129,7 @@ export class AiProxyController {
 
   private async forward(
     path: string,
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "PUT",
     principalId: string,
     requestId: string,
     body?: unknown,

@@ -29,6 +29,14 @@ Workspace. Service AI tidak membaca tabel Workspace secara langsung.
 6. Hasil streaming tampil sementara dan riwayat otomatis diperbarui.
 7. Buka ringkasan pada tabel untuk melihat tujuan, scope, risiko, acceptance
    criteria, dan langkah berikutnya.
+8. Periksa skor kualitas struktural, lalu beri feedback 1–5 pada brief.
+
+Panel menampilkan pemakaian generasi hari ini, batas concurrent run, dan masa
+retensi. Default per workspace adalah 50 generasi/hari, 2 proses bersamaan, dan
+retensi 90 hari. Batas dapat dioverride secara operasional pada
+`ai.workspace_limits`; advisory lock PostgreSQL menjaga kuota tetap konsisten
+saat request datang bersamaan. Run yang macet lebih dari lima menit ditandai
+gagal agar tidak mengunci kapasitas selamanya.
 
 Riwayat memakai pagination server-side 10 data per halaman dan tersinkron saat
 tab kembali aktif maupun setiap 10 detik. Viewer dapat membaca brief tetapi
@@ -63,10 +71,14 @@ docker compose exec -T postgres psql -U maknyak -d maknyak \
 ```
 
 Setiap eksekusi menyimpan versi model dan prompt, jumlah karakter input/output,
-latency, status, dan error code tanpa mencatat access token.
+latency, status, evaluasi struktural, serta error code tanpa mencatat access
+token. Brief dan run yang melewati `expires_at` dibersihkan saat service mulai
+dan setiap satu jam.
 
 ## Status Phase 2
 
 Project Brief adalah baseline pertama, bukan penyelesaian seluruh Phase 2.
-Conversation/memory retention, evaluation dataset, quality scoring, cost budget,
-abuse control khusus AI, dan tool sandbox masih menjadi pekerjaan berikutnya.
+Conversation/memory, evaluation dataset dan regression suite, provider token/cost
+budget, distributed tracing, serta tool sandbox masih menjadi pekerjaan
+berikutnya. Quality scoring, feedback, run budgets, concurrency guard, dan
+retention cleanup sudah tersedia.

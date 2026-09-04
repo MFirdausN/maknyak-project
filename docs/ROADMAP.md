@@ -33,8 +33,9 @@ Exit: end-to-end tenant isolation tests lulus dan satu pengguna dapat mengelola 
 - [x] Pilih customer problem pertama: mengubah ide kasar menjadi project brief terstruktur.
 - [x] Baseline provider abstraction, model registry, versioned prompt, streaming run, dan usage metering.
 - [x] Tenant-scoped brief history dengan pagination 10 item dan lazy-loaded dashboard UI.
-- Conversation/memory dengan retention policy; tool execution sandbox.
-- Evaluations, tracing, cost/latency budgets, dan abuse controls.
+- [x] Structural quality scoring, user feedback, daily/concurrency budgets, dan data retention cleanup.
+- Conversation/memory dan tool execution sandbox.
+- Evaluation dataset/regression suite, distributed tracing, serta provider token/cost budgets.
 
 Exit: pengguna menyelesaikan satu pekerjaan bernilai dengan kualitas terukur.
 

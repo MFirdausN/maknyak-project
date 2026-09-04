@@ -5,6 +5,8 @@ import {
   Get,
   Inject,
   Post,
+  Put,
+  Param,
   Query,
   Res,
   ServiceUnavailableException,
@@ -28,6 +30,11 @@ const listSchema = z.object({
   workspaceId: z.string().uuid(),
   page: z.coerce.number().int().min(1).max(10_000).default(1),
 });
+const feedbackSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().trim().max(1000).optional(),
+});
+const idSchema = z.string().uuid();
 
 interface StreamResponse {
   status(code: number): StreamResponse;
@@ -100,6 +107,27 @@ export class BriefController {
     @Body() body: unknown,
   ): Promise<Brief> {
     return this.briefs.generate(principalId, parse(generateSchema, body));
+  }
+
+  @Get("/usage")
+  usage(@PrincipalId() principalId: string, @Query() query: unknown) {
+    const input = parse(listSchema.pick({ workspaceId: true }), query);
+    return this.briefs.usage(principalId, input.workspaceId);
+  }
+
+  @Put("/briefs/:briefId/feedback")
+  feedback(
+    @PrincipalId() principalId: string,
+    @Param("briefId") briefId: string,
+    @Body() body: unknown,
+  ) {
+    const input = parse(feedbackSchema, body);
+    return this.briefs.feedback(
+      principalId,
+      parse(idSchema, briefId),
+      input.rating,
+      input.comment,
+    );
   }
 
   @Post("/briefs/stream")
