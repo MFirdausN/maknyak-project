@@ -2,6 +2,10 @@
 
 Fondasi software Maknyak: platform multi-tenant yang menjadi rumah bagi layanan inti, kemampuan AI, agents, dan produk SaaS.
 
+> **Proprietary software.** Seluruh hak cipta dimiliki Muhammad Firdaus
+> (`MFirdausN`). Penggunaan, duplikasi, distribusi, fork, atau kontribusi
+> memerlukan izin tertulis terlebih dahulu. Lihat [LICENSE](LICENSE).
+
 ## Mulai cepat
 
 Persyaratan: Node.js 22+, pnpm 10+, Docker, dan Docker Compose.
@@ -75,6 +79,8 @@ Setiap service menyediakan `/api/v1/health/live` untuk liveness dan `/api/v1/hea
 Migration SQL dijalankan oleh one-shot container `migrate` sebelum Identity dan Workspace dimulai. Ledger `platform.schema_migrations` menyimpan nama dan checksum setiap migration; perubahan terhadap migration yang sudah diterapkan akan menggagalkan startup. File migration berada di `infrastructure/postgres/init` dan dijalankan dalam transaksi.
 
 Mulai dari [visi](docs/VISION.md), lalu baca [arsitektur](docs/ARCHITECTURE.md), [domain](docs/DOMAINS.md), dan [roadmap](docs/ROADMAP.md). Keputusan penting dicatat sebagai ADR di `docs/decisions`.
+
+Untuk mencoba fondasi secara lengkap, ikuti [panduan mencoba Phase 0](docs/TRY_PHASE_0.md). Strategi environment dan akses contributor dijelaskan dalam [branching policy](docs/BRANCHING.md).
 
 ## Struktur
 
