@@ -38,6 +38,7 @@ export function WorkspaceConsole() {
   const [toast, setToast] = useState<Toast | null>(null);
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [members, setMembers] = useState<Membership[]>([]);
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
 
   useEffect(() => {
     void loadSession();
@@ -54,6 +55,51 @@ export function WorkspaceConsole() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  useEffect(() => {
+    if (!session?.authenticated) return;
+    let active = true;
+    let refreshing = false;
+
+    const refresh = async () => {
+      if (refreshing || document.visibilityState === "hidden") return;
+      refreshing = true;
+      try {
+        const items = await api<Workspace[]>("/api/workspaces");
+        if (!active) return;
+        setWorkspaces(items);
+        setSelected((current) =>
+          current
+            ? (items.find((item) => item.id === current.id) ?? items[0] ?? null)
+            : (items[0] ?? null),
+        );
+        if (selected && items.some((item) => item.id === selected.id)) {
+          const refreshedMembers = await api<Membership[]>(
+            `/api/workspaces/${selected.id}/members`,
+          );
+          if (active) setMembers(refreshedMembers);
+        }
+        if (active) setLastSynced(new Date());
+      } catch {
+        // Background refresh is silent; user-triggered actions still show errors.
+      } finally {
+        refreshing = false;
+      }
+    };
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    const timer = window.setInterval(() => void refresh(), 10_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [session?.authenticated, selected?.id]);
+
   async function loadSession() {
     const current = await api<Session>("/api/session");
     setSession(current);
@@ -63,7 +109,12 @@ export function WorkspaceConsole() {
   async function loadWorkspaces() {
     const items = await api<Workspace[]>("/api/workspaces");
     setWorkspaces(items);
-    setSelected((current) => current ?? items[0] ?? null);
+    setSelected((current) =>
+      current
+        ? (items.find((item) => item.id === current.id) ?? items[0] ?? null)
+        : (items[0] ?? null),
+    );
+    setLastSynced(new Date());
   }
 
   async function loadMembers(workspaceId: string) {
@@ -100,7 +151,7 @@ export function WorkspaceConsole() {
         },
       );
       showSuccess("Role anggota berhasil diperbarui.");
-      await loadMembers(selected.id);
+      await Promise.all([loadMembers(selected.id), loadWorkspaces()]);
     } catch (error) {
       showError(error);
       await loadMembers(selected.id);
@@ -115,7 +166,12 @@ export function WorkspaceConsole() {
         { method: "DELETE" },
       );
       showSuccess("Anggota berhasil dihapus.");
-      await loadMembers(selected.id);
+      await loadWorkspaces();
+      try {
+        await loadMembers(selected.id);
+      } catch {
+        setMembers([]);
+      }
     } catch (error) {
       showError(error);
     }
@@ -244,7 +300,10 @@ export function WorkspaceConsole() {
             <aside className="panel">
               <div className="panel-title">
                 <h2>Workspace</h2>
-                <small>{workspaces.length}</small>
+                <small>
+                  {workspaces.length} · Auto-sync
+                  {lastSynced && ` ${formatTime(lastSynced)}`}
+                </small>
               </div>
               <div className="workspace-list">
                 {workspaces.map((workspace) => (
@@ -422,4 +481,12 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   if (!response.ok)
     throw new Error(payload.message ?? `Request failed (${response.status})`);
   return payload;
+}
+
+function formatTime(date: Date): string {
+  return new Intl.DateTimeFormat("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
 }
