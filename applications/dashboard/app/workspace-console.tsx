@@ -26,11 +26,16 @@ interface Membership {
   role: Workspace["role"];
 }
 
+interface Toast {
+  kind: "success" | "error";
+  message: string;
+}
+
 export function WorkspaceConsole() {
   const [session, setSession] = useState<Session | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selected, setSelected] = useState<Workspace | null>(null);
-  const [notice, setNotice] = useState("");
+  const [toast, setToast] = useState<Toast | null>(null);
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [members, setMembers] = useState<Membership[]>([]);
 
@@ -42,6 +47,12 @@ export function WorkspaceConsole() {
     if (selected) void loadMembers(selected.id);
     else setMembers([]);
   }, [selected]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 5_000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   async function loadSession() {
     const current = await api<Session>("/api/session");
@@ -63,76 +74,123 @@ export function WorkspaceConsole() {
 
   async function acceptInvitation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    await api("/api/workspaces/invitations/accept", {
-      method: "POST",
-      body: JSON.stringify({ token: form.get("token") }),
-    });
-    event.currentTarget.reset();
-    setNotice("Undangan diterima dan workspace sudah ditambahkan.");
-    await loadWorkspaces();
+    const target = event.currentTarget;
+    try {
+      const form = new FormData(target);
+      await api("/api/workspaces/invitations/accept", {
+        method: "POST",
+        body: JSON.stringify({ token: form.get("token") }),
+      });
+      target.reset();
+      showSuccess("Undangan diterima dan workspace sudah ditambahkan.");
+      await loadWorkspaces();
+    } catch (error) {
+      showError(error);
+    }
   }
 
   async function changeRole(member: Membership, role: Workspace["role"]) {
     if (!selected) return;
-    await api(`/api/workspaces/${selected.id}/members/${member.principalId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ role }),
-    });
-    setNotice("Role anggota berhasil diperbarui.");
-    await loadMembers(selected.id);
+    try {
+      await api(
+        `/api/workspaces/${selected.id}/members/${member.principalId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ role }),
+        },
+      );
+      showSuccess("Role anggota berhasil diperbarui.");
+      await loadMembers(selected.id);
+    } catch (error) {
+      showError(error);
+      await loadMembers(selected.id);
+    }
   }
 
   async function removeMember(member: Membership) {
     if (!selected) return;
-    await api(`/api/workspaces/${selected.id}/members/${member.principalId}`, {
-      method: "DELETE",
-    });
-    setNotice("Anggota berhasil dihapus.");
-    await loadMembers(selected.id);
+    try {
+      await api(
+        `/api/workspaces/${selected.id}/members/${member.principalId}`,
+        { method: "DELETE" },
+      );
+      showSuccess("Anggota berhasil dihapus.");
+      await loadMembers(selected.id);
+    } catch (error) {
+      showError(error);
+    }
   }
 
   async function createWorkspace(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    await api("/api/workspaces", {
-      method: "POST",
-      body: JSON.stringify({ name: form.get("name"), slug: form.get("slug") }),
-    });
-    event.currentTarget.reset();
-    setNotice("Workspace berhasil dibuat.");
-    await loadWorkspaces();
+    const target = event.currentTarget;
+    try {
+      const form = new FormData(target);
+      await api("/api/workspaces", {
+        method: "POST",
+        body: JSON.stringify({
+          name: form.get("name"),
+          slug: form.get("slug"),
+        }),
+      });
+      target.reset();
+      showSuccess("Workspace berhasil dibuat.");
+      await loadWorkspaces();
+    } catch (error) {
+      showError(error);
+    }
   }
 
   async function createProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selected) return;
-    const form = new FormData(event.currentTarget);
-    await api(`/api/workspaces/${selected.id}/projects`, {
-      method: "POST",
-      body: JSON.stringify({ name: form.get("name") }),
-    });
-    event.currentTarget.reset();
-    setNotice("Project berhasil dibuat.");
+    const target = event.currentTarget;
+    try {
+      const form = new FormData(target);
+      await api(`/api/workspaces/${selected.id}/projects`, {
+        method: "POST",
+        body: JSON.stringify({ name: form.get("name") }),
+      });
+      target.reset();
+      showSuccess("Project berhasil dibuat.");
+    } catch (error) {
+      showError(error);
+    }
   }
 
   async function invite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selected) return;
-    const form = new FormData(event.currentTarget);
-    const created = await api<Invitation>(
-      `/api/workspaces/${selected.id}/invitations`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          email: form.get("email"),
-          role: form.get("role"),
-        }),
-      },
-    );
-    setInvitation(created);
-    event.currentTarget.reset();
-    setNotice("Undangan dibuat. Bagikan token hanya kepada email tujuan.");
+    const target = event.currentTarget;
+    try {
+      const form = new FormData(target);
+      const created = await api<Invitation>(
+        `/api/workspaces/${selected.id}/invitations`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            email: form.get("email"),
+            role: form.get("role"),
+          }),
+        },
+      );
+      setInvitation(created);
+      target.reset();
+      showSuccess("Undangan dibuat. Bagikan token hanya kepada email tujuan.");
+    } catch (error) {
+      showError(error);
+    }
+  }
+
+  function showSuccess(message: string) {
+    setToast({ kind: "success", message });
+  }
+
+  function showError(error: unknown) {
+    setToast({
+      kind: "error",
+      message: error instanceof Error ? error.message : "Terjadi kesalahan.",
+    });
   }
 
   return (
@@ -182,7 +240,6 @@ export function WorkspaceConsole() {
               Keluar
             </a>
           </header>
-          {notice && <p className="notice">{notice}</p>}
           <section className="console-grid">
             <aside className="panel">
               <div className="panel-title">
@@ -334,6 +391,23 @@ export function WorkspaceConsole() {
         <span>MAKNYAK / PLATFORM</span>
         <span>Makassar, Indonesia</span>
       </footer>
+      {toast && (
+        <div
+          className={`toast ${toast.kind}`}
+          role={toast.kind === "error" ? "alert" : "status"}
+          aria-live="polite"
+        >
+          <span>{toast.kind === "success" ? "Berhasil" : "Gagal"}</span>
+          <p>{toast.message}</p>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            aria-label="Tutup"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </main>
   );
 }
@@ -343,6 +417,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { "content-type": "application/json", ...init?.headers },
   });
+  if (response.status === 204) return undefined as T;
   const payload = (await response.json()) as T & { message?: string };
   if (!response.ok)
     throw new Error(payload.message ?? `Request failed (${response.status})`);
