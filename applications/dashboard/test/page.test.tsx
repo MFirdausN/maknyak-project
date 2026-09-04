@@ -4,10 +4,9 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import Home from "../app/page";
 
-test("dashboard exposes the platform domains and version", () => {
+test("dashboard exposes the secure tenancy console shell", () => {
   const html = renderToStaticMarkup(<Home />);
-  assert.match(html, /Foundation v0\.1/);
-  assert.match(html, /Identity/);
-  assert.match(html, /Workspace/);
-  assert.match(html, /AI/);
+  assert.match(html, /Phase 1/);
+  assert.match(html, /Memeriksa sesi/);
+  assert.match(html, /Maknyak Platform/);
 });

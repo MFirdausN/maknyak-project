@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help doctor bootstrap onboard build-images infra-up up dev down logs check smoke ai-up disk-audit disk-clean
+.PHONY: help doctor bootstrap onboard build-images infra-up up dev down logs check smoke phase1-test ai-up disk-audit disk-clean
 
 help:
 	@echo "Maknyak Platform"
@@ -13,6 +13,7 @@ help:
 	@echo "  make down       Stop infrastructure"
 	@echo "  make check      Run all quality checks"
 	@echo "  make smoke      Verify the running Docker stack"
+	@echo "  make phase1-test Verify tenant isolation and membership lifecycle"
 	@echo "  make disk-audit Inspect root, home, Docker, and journal usage"
 	@echo "  make disk-clean Clean safe caches/logs (run with sudo)"
 
@@ -52,6 +53,9 @@ check:
 
 smoke:
 	./scripts/smoke-test.sh
+
+phase1-test:
+	./scripts/phase1-tenancy-test.sh
 
 disk-audit:
 	./scripts/disk-maintenance.sh audit

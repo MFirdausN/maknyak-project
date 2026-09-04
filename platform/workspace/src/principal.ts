@@ -8,6 +8,7 @@ import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 
 const uuid = z.string().uuid();
+const email = z.string().email();
 
 export const PrincipalId = createParamDecorator(
   (_data: unknown, context: ExecutionContext): string => {
@@ -25,6 +26,18 @@ export const PrincipalId = createParamDecorator(
     if (!parsed.success)
       throw new UnauthorizedException("A valid principal context is required");
     return parsed.data;
+  },
+);
+
+export const PrincipalEmail = createParamDecorator(
+  (_data: unknown, context: ExecutionContext): string => {
+    const request = context
+      .switchToHttp()
+      .getRequest<{ header(name: string): string | undefined }>();
+    const parsed = email.safeParse(request.header("x-principal-email"));
+    if (!parsed.success)
+      throw new UnauthorizedException("A verified principal email is required");
+    return parsed.data.toLowerCase();
   },
 );
 

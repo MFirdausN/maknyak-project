@@ -42,6 +42,7 @@ make down
 make check     # lint, typecheck, test, build
 pnpm security:audit
 make smoke     # verifikasi stack Docker yang sedang berjalan
+make phase1-test # tenant isolation, invitation, ownership, audit, dan outbox
 make disk-audit
 sudo make disk-clean
 ```
@@ -80,7 +81,9 @@ Migration SQL dijalankan oleh one-shot container `migrate` sebelum Identity dan 
 
 Mulai dari [visi](docs/VISION.md), lalu baca [arsitektur](docs/ARCHITECTURE.md), [domain](docs/DOMAINS.md), dan [roadmap](docs/ROADMAP.md). Keputusan penting dicatat sebagai ADR di `docs/decisions`.
 
-Untuk mencoba fondasi secara lengkap, ikuti [panduan mencoba Phase 0](docs/TRY_PHASE_0.md). Strategi environment dan akses contributor dijelaskan dalam [branching policy](docs/BRANCHING.md).
+Untuk mencoba fondasi awal, ikuti [panduan Phase 0](docs/TRY_PHASE_0.md).
+Untuk alur secure multi-tenancy terbaru, ikuti [panduan mencoba Phase 1](docs/TRY_PHASE_1.md).
+Strategi environment dan akses contributor dijelaskan dalam [branching policy](docs/BRANCHING.md).
 
 ## Struktur
 
@@ -96,7 +99,7 @@ docs/           living architecture
 scripts/        otomasi repository
 ```
 
-Repository ini adalah baseline v0.1, bukan klaim bahwa seluruh platform sudah selesai. Vertical slice Identity dan Workspace sudah memiliki OIDC, persistence PostgreSQL, tenant policy, dan Gateway boundary; lifecycle browser serta invitation/audit masih dilanjutkan pada Phase 1.
+Repository ini adalah baseline v0.1, bukan klaim bahwa seluruh platform sudah selesai. Phase 1 menyediakan vertical slice secure multi-tenancy: browser OIDC PKCE, workspace membership dan invitation, audit append-only, outbox publisher, serta Gateway hardening.
 
 ## Troubleshooting storage Docker
 

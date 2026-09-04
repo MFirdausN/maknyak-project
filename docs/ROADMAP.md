@@ -18,12 +18,13 @@ Exit: contributor baru dapat menjalankan repository dan memahami batas domain da
 - [x] Gateway proxy dengan validation, timeout, dan upstream error propagation.
 - [x] OIDC authentication, JWKS verification, dan Identity principal synchronization.
 - [x] Internal service credential melindungi Identity dan Workspace trust boundary.
-- [ ] Browser Authorization Code + PKCE, logout, refresh, dan session lifecycle.
-- [ ] Invitation lifecycle, audit log, outbox publisher, dan full integration suite.
-- Integrasi UI sign-in, sign-out, refresh, dan service identity.
-- Workspace, membership, invitation, role, project, dan policy enforcement.
-- PostgreSQL migrations, transactional outbox, audit log, dan integration tests.
-- Gateway request context dan rate limiting.
+- [x] Browser Authorization Code + PKCE, logout, refresh, dan session lifecycle.
+- [x] Invitation lifecycle dengan token hash, email binding, expiry, revoke, dan acceptance.
+- [x] Ownership invariant yang aman terhadap mutasi konkuren dan tenant isolation suite.
+- [x] Append-only audit log serta transactional outbox publisher ke NATS.
+- [x] Dashboard untuk workspace, project, invitation, dan membership management.
+- [x] Gateway request context, Redis rate limiting, body limit, dan security headers.
+- [x] Full quality gate, Docker smoke test, serta Phase 1 integration test di CI.
 
 Exit: end-to-end tenant isolation tests lulus dan satu pengguna dapat mengelola workspace secara aman.
 

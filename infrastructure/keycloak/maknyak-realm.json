@@ -13,8 +13,12 @@
       "publicClient": true,
       "directAccessGrantsEnabled": true,
       "standardFlowEnabled": true,
-      "redirectUris": ["http://localhost:13003/*"],
-      "webOrigins": ["http://localhost:13003"]
+      "redirectUris": ["http://localhost:3003/*", "http://localhost:13003/*"],
+      "webOrigins": ["http://localhost:3003", "http://localhost:13003"],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:3003/*##http://localhost:13003/*",
+        "pkce.code.challenge.method": "S256"
+      }
     }
   ],
   "users": [
@@ -28,6 +32,22 @@
       "emailVerified": true,
       "credentials": [
         { "type": "password", "value": "maknyak-dev", "temporary": false }
+      ]
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "username": "collaborator",
+      "email": "collaborator@maknyak.local",
+      "firstName": "Maknyak",
+      "lastName": "Collaborator",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "maknyak-collaborator",
+          "temporary": false
+        }
       ]
     }
   ]

@@ -64,6 +64,8 @@ jobs:
         run: docker compose run --rm migrate
       - name: Run end-to-end smoke test
         run: make smoke
+      - name: Run Phase 1 tenant isolation test
+        run: make phase1-test
       - name: Print service logs on failure
         if: failure()
         run: docker compose logs --no-color

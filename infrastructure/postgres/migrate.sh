@@ -64,6 +64,9 @@ SELECT format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA identity TO %I', :
 SELECT format('GRANT USAGE ON SCHEMA workspace TO %I', :'workspace_user') \gexec
 SELECT format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA workspace TO %I', :'workspace_user') \gexec
 SELECT format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA workspace TO %I', :'workspace_user') \gexec
+SELECT format('GRANT USAGE ON SCHEMA audit TO %I', :'workspace_user') \gexec
+SELECT format('GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA audit TO %I', :'workspace_user') \gexec
+SELECT format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA audit TO %I', :'workspace_user') \gexec
 SELECT format('GRANT USAGE, CREATE ON SCHEMA keycloak TO %I', :'keycloak_user') \gexec
 SELECT format('GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA keycloak TO %I', :'keycloak_user') \gexec
 SELECT format('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA keycloak TO %I', :'keycloak_user') \gexec

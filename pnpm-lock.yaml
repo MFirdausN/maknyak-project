@@ -108,6 +108,9 @@ importers:
       jose:
         specifier: ^6.1.0
         version: 6.2.10
+      redis:
+        specifier: ^5.12.1
+        version: 5.12.1
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -182,6 +185,12 @@ importers:
       "@maknyak/contracts":
         specifier: workspace:*
         version: link:../../packages/contracts
+      "@nats-io/nats-core":
+        specifier: ^3.4.0
+        version: 3.4.0
+      "@nats-io/transport-node":
+        specifier: ^3.4.0
+        version: 3.4.0
       "@nestjs/common":
         specifier: ^11.1.6
         version: 11.2.3(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -1134,6 +1143,33 @@ packages:
       }
     engines: { node: ">=8" }
 
+  "@nats-io/nats-core@3.4.0":
+    resolution:
+      {
+        integrity: sha512-QMDM86EUNm+wudlKC67HLar/KHHQUvJGLfb4jbahje3pUk3K9afeck9fwsxBZF0eUFox6T/TA6m/t+lQqf+QsQ==,
+      }
+
+  "@nats-io/nkeys@2.0.3":
+    resolution:
+      {
+        integrity: sha512-JVt56GuE6Z89KUkI4TXUbSI9fmIfAmk6PMPknijmuL72GcD+UgIomTcRWiNvvJKxA01sBbmIPStqJs5cMRBC3A==,
+      }
+    engines: { node: ">=18.0.0" }
+
+  "@nats-io/nuid@3.0.0":
+    resolution:
+      {
+        integrity: sha512-QbXZDrxmYlrn5AD06gYcUTmEHwxn96HBQMIk7XTjDlEcx6FPzVBBPjp4AMRh1lEv6B4iJ6Xb/Uz61JugPXFRQg==,
+      }
+    engines: { node: ">= 22.x" }
+
+  "@nats-io/transport-node@3.4.0":
+    resolution:
+      {
+        integrity: sha512-hH7u7ejIBTFEJIZ8rIcMrHJI6wl+HhpO5sVFs1+ppmXa8RuB2+Lh1+UwTzZ5xTNNm1TKcRkYy+2qCV56qp8RxA==,
+      }
+    engines: { node: ">= 18.0.0" }
+
   "@nestjs/cli@11.0.24":
     resolution:
       {
@@ -1289,6 +1325,57 @@ packages:
     engines: { node: ">= 10" }
     cpu: [x64]
     os: [win32]
+
+  "@redis/bloom@5.12.1":
+    resolution:
+      {
+        integrity: sha512-PUUfv+ms7jgPSBVoo/DN4AkPHj4D5TZSd6SbJX7egzBplkYUcKmHRE8RKia7UtZ8bSQbLguLvxVO+asKtQfZWA==,
+      }
+    engines: { node: ">= 18.19.0" }
+    peerDependencies:
+      "@redis/client": ^5.12.1
+
+  "@redis/client@5.12.1":
+    resolution:
+      {
+        integrity: sha512-7aPGWeqA3uFm43o19umzdl16CEjK/JQGtSXVPevplTaOU3VJA/rseBC1QvYUz9lLDIMBimc4SW/zrW4S89BaCA==,
+      }
+    engines: { node: ">= 18.19.0" }
+    peerDependencies:
+      "@node-rs/xxhash": ^1.1.0
+      "@opentelemetry/api": ">=1 <2"
+    peerDependenciesMeta:
+      "@node-rs/xxhash":
+        optional: true
+      "@opentelemetry/api":
+        optional: true
+
+  "@redis/json@5.12.1":
+    resolution:
+      {
+        integrity: sha512-eOze75esLve4vfqDel7aMX08CNaiLLQS2fV8mpRN9NxPe1rVR4vQyYiW/OgtGUysF6QOr9ANhfxABKNOJfXdKg==,
+      }
+    engines: { node: ">= 18.19.0" }
+    peerDependencies:
+      "@redis/client": ^5.12.1
+
+  "@redis/search@5.12.1":
+    resolution:
+      {
+        integrity: sha512-ItlxbxC9cKI6IU1TLWoczwJCRb6TdmkEpWv05UrPawqaAnWGRu3rcIqsc5vN483T2fSociuyV1UkWIL5I4//2w==,
+      }
+    engines: { node: ">= 18.19.0" }
+    peerDependencies:
+      "@redis/client": ^5.12.1
+
+  "@redis/time-series@5.12.1":
+    resolution:
+      {
+        integrity: sha512-c6JL6E3EcZJuNqKFz+KM+l9l5mpcQiKvTwgA3blt5glWJ8hjDk0yeHN3beE/MpqYIQ8UEX44ItQzgkE/gCBELQ==,
+      }
+    engines: { node: ">= 18.19.0" }
+    peerDependencies:
+      "@redis/client": ^5.12.1
 
   "@swc/helpers@0.5.15":
     resolution:
@@ -1913,6 +2000,13 @@ packages:
         integrity: sha512-JQHZ2QMW6l3aH/j6xCqQThY/9OH4D/9ls34cgkUBiEeocRTU04tHfKPBsUK1PqZCUQM7GiA0IIXJSuXHI64Kbg==,
       }
     engines: { node: ">=0.8" }
+
+  cluster-key-slot@1.1.2:
+    resolution:
+      {
+        integrity: sha512-RMr0FhtfXemyinomL4hrWcYJxmX6deFdCxpJzhDttxgO1+bcCnkk+9drydLVDmAMG7NE6aN/fl4F7ucU/90gAA==,
+      }
+    engines: { node: ">=0.10.0" }
 
   color-convert@2.0.1:
     resolution:
@@ -3294,6 +3388,13 @@ packages:
       }
     engines: { node: ">= 14.18.0" }
 
+  redis@5.12.1:
+    resolution:
+      {
+        integrity: sha512-LDsoVvb/CpoV9EN3FXvgvSHNJWuCIzl9MiO3ppOevuGLpSGJhwfQjpEwfFJcQvNSddHADDdZaWx0HnmMxRXG7g==,
+      }
+    engines: { node: ">= 18.19.0" }
+
   reflect-metadata@0.2.2:
     resolution:
       {
@@ -3718,6 +3819,12 @@ packages:
         integrity: sha512-AswgMPnpOoaVZHrrSBejETzEbuIA69OVGwfkHwfrY0A23VjWXBANzgq9+OymWOHAIArB7D1+1z498WY8fGg1Jw==,
       }
     hasBin: true
+
+  tweetnacl@1.0.3:
+    resolution:
+      {
+        integrity: sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw==,
+      }
 
   type-check@0.4.0:
     resolution:
@@ -4409,6 +4516,23 @@ snapshots:
 
   "@lukeed/csprng@1.1.0": {}
 
+  "@nats-io/nats-core@3.4.0":
+    dependencies:
+      "@nats-io/nkeys": 2.0.3
+      "@nats-io/nuid": 3.0.0
+
+  "@nats-io/nkeys@2.0.3":
+    dependencies:
+      tweetnacl: 1.0.3
+
+  "@nats-io/nuid@3.0.0": {}
+
+  "@nats-io/transport-node@3.4.0":
+    dependencies:
+      "@nats-io/nats-core": 3.4.0
+      "@nats-io/nkeys": 2.0.3
+      "@nats-io/nuid": 3.0.0
+
   "@nestjs/cli@11.0.24(@types/node@24.13.3)(prettier@3.9.6)":
     dependencies:
       "@angular-devkit/core": 19.2.27(chokidar@4.0.3)
@@ -4520,6 +4644,26 @@ snapshots:
 
   "@next/swc-win32-x64-msvc@15.5.25":
     optional: true
+
+  "@redis/bloom@5.12.1(@redis/client@5.12.1)":
+    dependencies:
+      "@redis/client": 5.12.1
+
+  "@redis/client@5.12.1":
+    dependencies:
+      cluster-key-slot: 1.1.2
+
+  "@redis/json@5.12.1(@redis/client@5.12.1)":
+    dependencies:
+      "@redis/client": 5.12.1
+
+  "@redis/search@5.12.1(@redis/client@5.12.1)":
+    dependencies:
+      "@redis/client": 5.12.1
+
+  "@redis/time-series@5.12.1(@redis/client@5.12.1)":
+    dependencies:
+      "@redis/client": 5.12.1
 
   "@swc/helpers@0.5.15":
     dependencies:
@@ -4926,6 +5070,8 @@ snapshots:
   client-only@0.0.1: {}
 
   clone@1.0.4: {}
+
+  cluster-key-slot@1.1.2: {}
 
   color-convert@2.0.1:
     dependencies:
@@ -5696,6 +5842,17 @@ snapshots:
 
   readdirp@4.1.2: {}
 
+  redis@5.12.1:
+    dependencies:
+      "@redis/bloom": 5.12.1(@redis/client@5.12.1)
+      "@redis/client": 5.12.1
+      "@redis/json": 5.12.1(@redis/client@5.12.1)
+      "@redis/search": 5.12.1(@redis/client@5.12.1)
+      "@redis/time-series": 5.12.1(@redis/client@5.12.1)
+    transitivePeerDependencies:
+      - "@node-rs/xxhash"
+      - "@opentelemetry/api"
+
   reflect-metadata@0.2.2: {}
 
   require-from-string@2.0.2: {}
@@ -5962,6 +6119,8 @@ snapshots:
       "@turbo/linux-arm64": 2.10.12
       "@turbo/windows-64": 2.10.12
       "@turbo/windows-arm64": 2.10.12
+
+  tweetnacl@1.0.3: {}
 
   type-check@0.4.0:
     dependencies:

@@ -1,0 +1,350 @@
+"use client";
+
+import React, { type FormEvent, useEffect, useState } from "react";
+
+interface Session {
+  authenticated: boolean;
+  principal?: { username?: string; email?: string; name?: string };
+}
+
+interface Workspace {
+  id: string;
+  slug: string;
+  name: string;
+  role: "owner" | "admin" | "member" | "viewer";
+}
+
+interface Invitation {
+  id: string;
+  email: string;
+  role: string;
+  token?: string;
+}
+
+interface Membership {
+  principalId: string;
+  role: Workspace["role"];
+}
+
+export function WorkspaceConsole() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [selected, setSelected] = useState<Workspace | null>(null);
+  const [notice, setNotice] = useState("");
+  const [invitation, setInvitation] = useState<Invitation | null>(null);
+  const [members, setMembers] = useState<Membership[]>([]);
+
+  useEffect(() => {
+    void loadSession();
+  }, []);
+
+  useEffect(() => {
+    if (selected) void loadMembers(selected.id);
+    else setMembers([]);
+  }, [selected]);
+
+  async function loadSession() {
+    const current = await api<Session>("/api/session");
+    setSession(current);
+    if (current.authenticated) await loadWorkspaces();
+  }
+
+  async function loadWorkspaces() {
+    const items = await api<Workspace[]>("/api/workspaces");
+    setWorkspaces(items);
+    setSelected((current) => current ?? items[0] ?? null);
+  }
+
+  async function loadMembers(workspaceId: string) {
+    setMembers(
+      await api<Membership[]>(`/api/workspaces/${workspaceId}/members`),
+    );
+  }
+
+  async function acceptInvitation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await api("/api/workspaces/invitations/accept", {
+      method: "POST",
+      body: JSON.stringify({ token: form.get("token") }),
+    });
+    event.currentTarget.reset();
+    setNotice("Undangan diterima dan workspace sudah ditambahkan.");
+    await loadWorkspaces();
+  }
+
+  async function changeRole(member: Membership, role: Workspace["role"]) {
+    if (!selected) return;
+    await api(`/api/workspaces/${selected.id}/members/${member.principalId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    });
+    setNotice("Role anggota berhasil diperbarui.");
+    await loadMembers(selected.id);
+  }
+
+  async function removeMember(member: Membership) {
+    if (!selected) return;
+    await api(`/api/workspaces/${selected.id}/members/${member.principalId}`, {
+      method: "DELETE",
+    });
+    setNotice("Anggota berhasil dihapus.");
+    await loadMembers(selected.id);
+  }
+
+  async function createWorkspace(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await api("/api/workspaces", {
+      method: "POST",
+      body: JSON.stringify({ name: form.get("name"), slug: form.get("slug") }),
+    });
+    event.currentTarget.reset();
+    setNotice("Workspace berhasil dibuat.");
+    await loadWorkspaces();
+  }
+
+  async function createProject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selected) return;
+    const form = new FormData(event.currentTarget);
+    await api(`/api/workspaces/${selected.id}/projects`, {
+      method: "POST",
+      body: JSON.stringify({ name: form.get("name") }),
+    });
+    event.currentTarget.reset();
+    setNotice("Project berhasil dibuat.");
+  }
+
+  async function invite(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selected) return;
+    const form = new FormData(event.currentTarget);
+    const created = await api<Invitation>(
+      `/api/workspaces/${selected.id}/invitations`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          email: form.get("email"),
+          role: form.get("role"),
+        }),
+      },
+    );
+    setInvitation(created);
+    event.currentTarget.reset();
+    setNotice("Undangan dibuat. Bagikan token hanya kepada email tujuan.");
+  }
+
+  return (
+    <main>
+      <nav>
+        <span className="mark">M</span>
+        <strong>Maknyak Platform</strong>
+        <span className="status">
+          <i /> Phase 1 · Secure tenancy
+        </span>
+      </nav>
+
+      {!session ? (
+        <section className="panel loading">Memeriksa sesi…</section>
+      ) : !session.authenticated ? (
+        <section className="hero">
+          <p className="eyebrow">SECURE MULTI-TENANT CONTROL PLANE</p>
+          <h1>
+            Satu fondasi.
+            <br />
+            <em>Banyak produk.</em>
+          </h1>
+          <p className="lead">
+            Masuk melalui OpenID Connect dengan Authorization Code dan PKCE
+            untuk mengelola workspace secara aman.
+          </p>
+          <div className="actions">
+            <a href="/api/auth/login">
+              Masuk dengan Keycloak <span>→</span>
+            </a>
+          </div>
+        </section>
+      ) : (
+        <>
+          <header className="console-header">
+            <div>
+              <p className="eyebrow">WORKSPACE CONTROL PLANE</p>
+              <h1>
+                Halo,{" "}
+                {session.principal?.name ??
+                  session.principal?.username ??
+                  "user"}
+                .
+              </h1>
+            </div>
+            <a className="quiet-link" href="/api/auth/logout">
+              Keluar
+            </a>
+          </header>
+          {notice && <p className="notice">{notice}</p>}
+          <section className="console-grid">
+            <aside className="panel">
+              <div className="panel-title">
+                <h2>Workspace</h2>
+                <small>{workspaces.length}</small>
+              </div>
+              <div className="workspace-list">
+                {workspaces.map((workspace) => (
+                  <button
+                    key={workspace.id}
+                    className={selected?.id === workspace.id ? "selected" : ""}
+                    onClick={() => setSelected(workspace)}
+                  >
+                    <strong>{workspace.name}</strong>
+                    <span>
+                      {workspace.role} · {workspace.slug}
+                    </span>
+                  </button>
+                ))}
+                {workspaces.length === 0 && (
+                  <p className="muted">Belum ada workspace.</p>
+                )}
+              </div>
+              <form onSubmit={createWorkspace}>
+                <label>
+                  Nama
+                  <input name="name" required minLength={2} maxLength={100} />
+                </label>
+                <label>
+                  Slug
+                  <input
+                    name="slug"
+                    required
+                    pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                  />
+                </label>
+                <button type="submit">Buat workspace</button>
+              </form>
+              <form onSubmit={acceptInvitation}>
+                <h3>Terima undangan</h3>
+                <label>
+                  Token
+                  <input name="token" required minLength={32} />
+                </label>
+                <button type="submit">Gabung workspace</button>
+              </form>
+            </aside>
+            <section className="panel detail">
+              {selected ? (
+                <>
+                  <div className="panel-title">
+                    <div>
+                      <small>{selected.role}</small>
+                      <h2>{selected.name}</h2>
+                    </div>
+                    <code>{selected.id}</code>
+                  </div>
+                  <div className="forms-grid">
+                    <form onSubmit={createProject}>
+                      <h3>Project baru</h3>
+                      <label>
+                        Nama
+                        <input
+                          name="name"
+                          required
+                          minLength={2}
+                          maxLength={100}
+                        />
+                      </label>
+                      <button
+                        type="submit"
+                        disabled={selected.role === "viewer"}
+                      >
+                        Buat project
+                      </button>
+                    </form>
+                    <form onSubmit={invite}>
+                      <h3>Undang anggota</h3>
+                      <label>
+                        Email
+                        <input name="email" type="email" required />
+                      </label>
+                      <label>
+                        Role
+                        <select name="role" defaultValue="member">
+                          <option value="admin">Admin</option>
+                          <option value="member">Member</option>
+                          <option value="viewer">Viewer</option>
+                        </select>
+                      </label>
+                      <button
+                        type="submit"
+                        disabled={!["owner", "admin"].includes(selected.role)}
+                      >
+                        Buat undangan
+                      </button>
+                    </form>
+                  </div>
+                  {invitation?.token && (
+                    <div className="token">
+                      <small>Token undangan sekali tampil</small>
+                      <code>{invitation.token}</code>
+                    </div>
+                  )}
+                  <div className="member-list">
+                    <h3>Anggota</h3>
+                    {members.map((member) => (
+                      <div className="member-row" key={member.principalId}>
+                        <code>{member.principalId}</code>
+                        <select
+                          aria-label={`Role ${member.principalId}`}
+                          value={member.role}
+                          disabled={selected.role !== "owner"}
+                          onChange={(event) =>
+                            void changeRole(
+                              member,
+                              event.target.value as Workspace["role"],
+                            )
+                          }
+                        >
+                          <option value="owner">Owner</option>
+                          <option value="admin">Admin</option>
+                          <option value="member">Member</option>
+                          <option value="viewer">Viewer</option>
+                        </select>
+                        <button
+                          type="button"
+                          className="danger"
+                          disabled={selected.role !== "owner"}
+                          onClick={() => void removeMember(member)}
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="empty">
+                  <h2>Pilih atau buat workspace</h2>
+                  <p>Workspace adalah batas isolasi tenant Maknyak Platform.</p>
+                </div>
+              )}
+            </section>
+          </section>
+        </>
+      )}
+      <footer>
+        <span>MAKNYAK / PLATFORM</span>
+        <span>Makassar, Indonesia</span>
+      </footer>
+    </main>
+  );
+}
+
+async function api<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    ...init,
+    headers: { "content-type": "application/json", ...init?.headers },
+  });
+  const payload = (await response.json()) as T & { message?: string };
+  if (!response.ok)
+    throw new Error(payload.message ?? `Request failed (${response.status})`);
+  return payload;
+}

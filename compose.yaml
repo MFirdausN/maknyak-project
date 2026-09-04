@@ -8,6 +8,8 @@ services:
       GATEWAY_PORT: 3000
       IDENTITY_URL: http://identity:3001
       WORKSPACE_URL: http://workspace:3002
+      REDIS_URL: redis://redis:6379
+      GATEWAY_RATE_LIMIT: ${GATEWAY_RATE_LIMIT:-120}
       AUTH_MODE: ${AUTH_MODE:-oidc}
       OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:8080/realms/maknyak}
       OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://keycloak:8080/realms/maknyak/protocol/openid-connect/certs}
@@ -22,6 +24,8 @@ services:
       workspace:
         condition: service_healthy
       keycloak:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test:
@@ -166,6 +170,12 @@ services:
     environment:
       HOSTNAME: 0.0.0.0
       NEXT_PUBLIC_API_URL: http://localhost:${GATEWAY_HOST_PORT:-3000}
+      DASHBOARD_PUBLIC_URL: http://localhost:${DASHBOARD_HOST_PORT:-3003}
+      GATEWAY_INTERNAL_URL: http://gateway:3000
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:8080/realms/maknyak}
+      OIDC_TOKEN_URL: http://keycloak:8080/realms/maknyak/protocol/openid-connect/token
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-maknyak-cli}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     init: true
     ports:
       - "127.0.0.1:${DASHBOARD_HOST_PORT:-3003}:3003"
