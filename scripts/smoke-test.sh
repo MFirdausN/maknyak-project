@@ -20,12 +20,14 @@ assert_health() {
 gateway_port="$(compose_port gateway 3000)"
 identity_port="$(compose_port identity 3001)"
 workspace_port="$(compose_port workspace 3002)"
+ai_port="$(compose_port ai 3004)"
 dashboard_port="$(compose_port dashboard 3003)"
 keycloak_port="$(compose_port keycloak 8080)"
 
 assert_health gateway "$gateway_port"
 assert_health identity "$identity_port"
 assert_health workspace "$workspace_port"
+assert_health ai "$ai_port"
 
 dashboard_status="$(curl --silent --output /dev/null --write-out '%{http_code}' "http://localhost:${dashboard_port}")"
 [[ "$dashboard_status" == "200" ]] || { echo "dashboard returned ${dashboard_status}" >&2; exit 1; }
@@ -38,6 +40,10 @@ echo "ok: gateway rejects unauthenticated workspace access"
 internal_status="$(curl --silent --output /dev/null --write-out '%{http_code}' "http://localhost:${workspace_port}/api/v1/workspaces")"
 [[ "$internal_status" == "401" ]] || { echo "direct workspace request returned ${internal_status}" >&2; exit 1; }
 echo "ok: workspace rejects requests without service credentials"
+
+ai_internal_status="$(curl --silent --output /dev/null --write-out '%{http_code}' "http://localhost:${ai_port}/api/v1/models")"
+[[ "$ai_internal_status" == "401" ]] || { echo "direct AI request returned ${ai_internal_status}" >&2; exit 1; }
+echo "ok: AI rejects requests without service credentials"
 
 access_token="$(
   curl --fail --silent --show-error \

@@ -11,6 +11,7 @@ COPY applications/dashboard/package.json applications/dashboard/package.json
 COPY platform/gateway/package.json platform/gateway/package.json
 COPY platform/identity/package.json platform/identity/package.json
 COPY platform/workspace/package.json platform/workspace/package.json
+COPY services/ai/package.json services/ai/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 
@@ -18,6 +19,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY applications ./applications
 COPY platform ./platform
+COPY services ./services
 COPY packages ./packages
 
 RUN pnpm build

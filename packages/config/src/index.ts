@@ -7,8 +7,15 @@ const baseSchema = z.object({
     .default("development"),
 });
 
-export function serviceConfig(service: "gateway" | "identity" | "workspace") {
-  const defaults = { gateway: 3000, identity: 3001, workspace: 3002 } as const;
+export function serviceConfig(
+  service: "gateway" | "identity" | "workspace" | "ai",
+) {
+  const defaults = {
+    gateway: 3000,
+    identity: 3001,
+    workspace: 3002,
+    ai: 3004,
+  } as const;
   return baseSchema
     .extend({
       PORT: z.coerce
@@ -29,6 +36,7 @@ export const gatewayConfigSchema = baseSchema
     GATEWAY_PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
     IDENTITY_URL: z.string().url().default("http://localhost:3001"),
     WORKSPACE_URL: z.string().url().default("http://localhost:3002"),
+    AI_URL: z.string().url().default("http://localhost:3004"),
     AUTH_MODE: z.enum(["oidc", "development"]).default("oidc"),
     OIDC_ISSUER: z.string().url(),
     OIDC_JWKS_URL: z.string().url(),

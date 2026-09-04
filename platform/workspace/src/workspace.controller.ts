@@ -50,6 +50,11 @@ const createInvitationSchema = z.object({
   role: z.enum(["admin", "member", "viewer"]),
 });
 const acceptInvitationSchema = z.object({ token: z.string().min(32).max(256) });
+const authorizeSchema = z.object({
+  workspaceId: z.string().uuid(),
+  minimumRole: z.enum(["owner", "admin", "member", "viewer"]),
+  projectId: z.string().uuid().optional(),
+});
 
 export const workspaceInfo: ServiceInfo = {
   name: "workspace",
@@ -102,6 +107,24 @@ export class WorkspaceController {
   @Get("/workspaces")
   list(@PrincipalId() principalId: string): Promise<Workspace[]> {
     return this.workspaces.list(principalId);
+  }
+
+  @Post("/internal/authorize")
+  authorize(
+    @PrincipalId() principalId: string,
+    @Body() body: unknown,
+  ): Promise<{
+    workspaceId: string;
+    principalId: string;
+    role: "owner" | "admin" | "member" | "viewer";
+  }> {
+    const input = parse(authorizeSchema, body);
+    return this.workspaces.authorize(
+      principalId,
+      input.workspaceId,
+      input.minimumRole,
+      input.projectId,
+    );
   }
 
   @Post("/workspaces")

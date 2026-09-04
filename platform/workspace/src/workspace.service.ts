@@ -121,6 +121,30 @@ export class WorkspaceService {
     return this.toWorkspace(row);
   }
 
+  async authorize(
+    principalId: string,
+    workspaceId: string,
+    minimumRole: WorkspaceRole,
+    projectId?: string,
+  ): Promise<{
+    workspaceId: string;
+    principalId: string;
+    role: WorkspaceRole;
+  }> {
+    const role = await this.role(principalId, workspaceId);
+    requireRole(role, minimumRole);
+    if (projectId) {
+      const project = await this.database.query(
+        `SELECT 1 FROM workspace.projects WHERE id = $1 AND workspace_id = $2`,
+        [projectId, workspaceId],
+      );
+      if (project.rowCount !== 1)
+        throw new NotFoundException("Project not found in workspace");
+    }
+    if (!role) throw new NotFoundException("Workspace membership not found");
+    return { workspaceId, principalId, role };
+  }
+
   async addMember(
     principalId: string,
     workspaceId: string,

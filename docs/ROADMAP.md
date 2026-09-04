@@ -30,8 +30,9 @@ Exit: end-to-end tenant isolation tests lulus dan satu pengguna dapat mengelola 
 
 ## Phase 2 — AI vertical slice
 
-- Pilih satu customer problem, bukan generic chat.
-- Provider abstraction, model registry, prompts, streaming run, usage metering.
+- [x] Pilih customer problem pertama: mengubah ide kasar menjadi project brief terstruktur.
+- [x] Baseline provider abstraction, model registry, versioned prompt, streaming run, dan usage metering.
+- [x] Tenant-scoped brief history dengan pagination 10 item dan lazy-loaded dashboard UI.
 - Conversation/memory dengan retention policy; tool execution sandbox.
 - Evaluations, tracing, cost/latency budgets, dan abuse controls.
 

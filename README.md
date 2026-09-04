@@ -19,14 +19,15 @@ make onboard
 
 Alamat lokal:
 
-| Komponen         | URL                                 |
-| ---------------- | ----------------------------------- |
-| Dashboard        | http://localhost:3003               |
-| API Gateway      | http://localhost:3000/api/v1        |
-| Identity health  | http://localhost:3001/api/v1/health |
-| Workspace health | http://localhost:3002/api/v1/health |
-| MinIO console    | http://localhost:9001               |
-| NATS monitoring  | http://localhost:8222               |
+| Komponen         | URL                                       |
+| ---------------- | ----------------------------------------- |
+| Dashboard        | http://localhost:3003                     |
+| API Gateway      | http://localhost:3000/api/v1              |
+| Identity health  | http://localhost:3001/api/v1/health       |
+| Workspace health | http://localhost:3002/api/v1/health       |
+| AI health        | http://localhost:3004/api/v1/health/ready |
+| MinIO console    | http://localhost:9001                     |
+| NATS monitoring  | http://localhost:8222                     |
 
 Port host dapat diubah lewat `.env` tanpa mengubah komunikasi internal container. Nilai aktual dapat dilihat dengan `docker compose ps`; `.env.example` memakai port standar.
 
@@ -43,6 +44,7 @@ make check     # lint, typecheck, test, build
 pnpm security:audit
 make smoke     # verifikasi stack Docker yang sedang berjalan
 make phase1-test # tenant isolation, invitation, ownership, audit, dan outbox
+make phase2-test # AI project brief, streaming, pagination, usage, dan isolation
 make disk-audit
 sudo make disk-clean
 ```
@@ -83,6 +85,7 @@ Mulai dari [visi](docs/VISION.md), lalu baca [arsitektur](docs/ARCHITECTURE.md),
 
 Untuk mencoba fondasi awal, ikuti [panduan Phase 0](docs/TRY_PHASE_0.md).
 Untuk alur secure multi-tenancy terbaru, ikuti [panduan mencoba Phase 1](docs/TRY_PHASE_1.md).
+Baseline AI Project Brief tersedia di [panduan mencoba Phase 2](docs/TRY_PHASE_2.md).
 Strategi environment dan akses contributor dijelaskan dalam [branching policy](docs/BRANCHING.md).
 
 ## Struktur

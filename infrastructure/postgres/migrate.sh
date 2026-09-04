@@ -6,6 +6,8 @@ psql --set ON_ERROR_STOP=1 \
   --variable="identity_password=$IDENTITY_DB_PASSWORD" \
   --variable="workspace_user=$WORKSPACE_DB_USER" \
   --variable="workspace_password=$WORKSPACE_DB_PASSWORD" \
+  --variable="ai_user=$AI_DB_USER" \
+  --variable="ai_password=$AI_DB_PASSWORD" \
   --variable="keycloak_user=$KEYCLOAK_DB_USER" \
   --variable="keycloak_password=$KEYCLOAK_DB_PASSWORD" <<'SQL'
 CREATE SCHEMA IF NOT EXISTS platform;
@@ -20,6 +22,9 @@ SELECT format('ALTER ROLE %I PASSWORD %L', :'identity_user', :'identity_password
 SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'workspace_user', :'workspace_password')
 WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'workspace_user') \gexec
 SELECT format('ALTER ROLE %I PASSWORD %L', :'workspace_user', :'workspace_password') \gexec
+SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'ai_user', :'ai_password')
+WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'ai_user') \gexec
+SELECT format('ALTER ROLE %I PASSWORD %L', :'ai_user', :'ai_password') \gexec
 SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'keycloak_user', :'keycloak_password')
 WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'keycloak_user') \gexec
 SELECT format('ALTER ROLE %I PASSWORD %L', :'keycloak_user', :'keycloak_password') \gexec
@@ -57,6 +62,7 @@ done
 psql --set ON_ERROR_STOP=1 \
   --variable="identity_user=$IDENTITY_DB_USER" \
   --variable="workspace_user=$WORKSPACE_DB_USER" \
+  --variable="ai_user=$AI_DB_USER" \
   --variable="keycloak_user=$KEYCLOAK_DB_USER" <<'SQL'
 SELECT format('GRANT USAGE ON SCHEMA identity TO %I', :'identity_user') \gexec
 SELECT format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA identity TO %I', :'identity_user') \gexec
@@ -67,10 +73,14 @@ SELECT format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA workspace TO %I', 
 SELECT format('GRANT USAGE ON SCHEMA audit TO %I', :'workspace_user') \gexec
 SELECT format('GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA audit TO %I', :'workspace_user') \gexec
 SELECT format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA audit TO %I', :'workspace_user') \gexec
+SELECT format('GRANT USAGE ON SCHEMA ai TO %I', :'ai_user') \gexec
+SELECT format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ai TO %I', :'ai_user') \gexec
+SELECT format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA ai TO %I', :'ai_user') \gexec
 SELECT format('GRANT USAGE, CREATE ON SCHEMA keycloak TO %I', :'keycloak_user') \gexec
 SELECT format('GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA keycloak TO %I', :'keycloak_user') \gexec
 SELECT format('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA keycloak TO %I', :'keycloak_user') \gexec
 SELECT format('GRANT CONNECT ON DATABASE %I TO %I', current_database(), :'identity_user') \gexec
 SELECT format('GRANT CONNECT ON DATABASE %I TO %I', current_database(), :'workspace_user') \gexec
+SELECT format('GRANT CONNECT ON DATABASE %I TO %I', current_database(), :'ai_user') \gexec
 SELECT format('GRANT CONNECT ON DATABASE %I TO %I', current_database(), :'keycloak_user') \gexec
 SQL

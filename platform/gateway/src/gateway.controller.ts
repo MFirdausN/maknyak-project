@@ -35,6 +35,7 @@ export class GatewayController {
     const upstreams = [
       process.env.IDENTITY_URL ?? "http://localhost:3001",
       process.env.WORKSPACE_URL ?? "http://localhost:3002",
+      process.env.AI_URL ?? "http://localhost:3004",
     ];
     try {
       const responses = await Promise.all(

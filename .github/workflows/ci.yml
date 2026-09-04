@@ -66,6 +66,8 @@ jobs:
         run: make smoke
       - name: Run Phase 1 tenant isolation test
         run: make phase1-test
+      - name: Run Phase 2 AI project brief test
+        run: make phase2-test
       - name: Print service logs on failure
         if: failure()
         run: docker compose logs --no-color

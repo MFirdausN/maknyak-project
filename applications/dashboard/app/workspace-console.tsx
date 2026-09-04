@@ -1,6 +1,19 @@
 "use client";
 
-import React, { type FormEvent, useEffect, useState } from "react";
+import React, {
+  type FormEvent,
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
+
+const ProjectBriefPanel = lazy(() =>
+  import("./project-brief-panel").then((module) => ({
+    default: module.ProjectBriefPanel,
+  })),
+);
 
 interface Session {
   authenticated: boolean;
@@ -39,6 +52,17 @@ export function WorkspaceConsole() {
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [members, setMembers] = useState<Membership[]>([]);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
+
+  const showSuccess = useCallback((message: string) => {
+    setToast({ kind: "success", message });
+  }, []);
+
+  const showError = useCallback((error: unknown) => {
+    setToast({
+      kind: "error",
+      message: error instanceof Error ? error.message : "Terjadi kesalahan.",
+    });
+  }, []);
 
   useEffect(() => {
     void loadSession();
@@ -238,17 +262,6 @@ export function WorkspaceConsole() {
     }
   }
 
-  function showSuccess(message: string) {
-    setToast({ kind: "success", message });
-  }
-
-  function showError(error: unknown) {
-    setToast({
-      kind: "error",
-      message: error instanceof Error ? error.message : "Terjadi kesalahan.",
-    });
-  }
-
   return (
     <main>
       <nav>
@@ -435,6 +448,20 @@ export function WorkspaceConsole() {
                       </div>
                     ))}
                   </div>
+                  <Suspense
+                    fallback={
+                      <div className="brief-loading">
+                        Memuat AI Project Brief…
+                      </div>
+                    }
+                  >
+                    <ProjectBriefPanel
+                      workspaceId={selected.id}
+                      workspaceRole={selected.role}
+                      onSuccess={showSuccess}
+                      onError={showError}
+                    />
+                  </Suspense>
                 </>
               ) : (
                 <div className="empty">

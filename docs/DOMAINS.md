@@ -6,7 +6,7 @@
 | Workspace    | Multi-tenancy dan akses organisasi                          | Workspace, Membership, Role, Project | Core    |
 | Gateway      | Public API composition, rate limiting, request context      | Route, Client policy                 | Core    |
 | Audit        | Rekaman aksi penting yang append-only                       | Audit event                          | Core    |
-| AI           | Model access, conversation, prompt, tool execution          | Conversation, Model, Prompt, Run     | Next    |
+| AI           | Model access, project brief, prompt, tool execution         | Brief, Model, Prompt, Run            | Active  |
 | Notification | Preference dan pengiriman pesan                             | Template, Delivery, Preference       | Next    |
 | Storage      | Metadata dan policy object                                  | Object, Bucket policy                | Next    |
 | Search       | Indexing dan retrieval lintas produk                        | Index, Document                      | Later   |

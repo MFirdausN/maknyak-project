@@ -8,6 +8,7 @@ services:
       GATEWAY_PORT: 3000
       IDENTITY_URL: http://identity:3001
       WORKSPACE_URL: http://workspace:3002
+      AI_URL: http://ai:3004
       REDIS_URL: redis://redis:6379
       GATEWAY_RATE_LIMIT: ${GATEWAY_RATE_LIMIT:-120}
       AUTH_MODE: ${AUTH_MODE:-oidc}
@@ -22,6 +23,8 @@ services:
       identity:
         condition: service_healthy
       workspace:
+        condition: service_healthy
+      ai:
         condition: service_healthy
       keycloak:
         condition: service_healthy
@@ -104,6 +107,37 @@ services:
       retries: 15
     restart: unless-stopped
 
+  ai:
+    image: maknyak-platform-runtime:latest
+    command: ["node", "services/ai/dist/src/main.js"]
+    environment:
+      AI_PORT: 3004
+      DATABASE_URL: postgresql://${AI_DB_USER:-maknyak_ai}:${AI_DB_PASSWORD:-ai_local}@postgres:5432/${POSTGRES_DB:-maknyak}
+      WORKSPACE_URL: http://workspace:3002
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-in-every-environment}
+      OLLAMA_URL: http://ollama:11434
+      AI_ENABLE_OLLAMA: ${AI_ENABLE_OLLAMA:-false}
+    init: true
+    ports:
+      - "127.0.0.1:${AI_HOST_PORT:-3004}:3004"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      workspace:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3004/api/v1/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+
   migrate:
     image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
     environment:
@@ -116,6 +150,8 @@ services:
       IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-identity_local}
       WORKSPACE_DB_USER: ${WORKSPACE_DB_USER:-maknyak_workspace}
       WORKSPACE_DB_PASSWORD: ${WORKSPACE_DB_PASSWORD:-workspace_local}
+      AI_DB_USER: ${AI_DB_USER:-maknyak_ai}
+      AI_DB_PASSWORD: ${AI_DB_PASSWORD:-ai_local}
       KEYCLOAK_DB_USER: ${KEYCLOAK_DB_USER:-maknyak_keycloak}
       KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_local}
     volumes:
