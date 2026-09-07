@@ -203,16 +203,17 @@ export class AgentService {
 
   async operations(principalId: string, workspaceId: string) {
     await this.authorize(principalId, workspaceId, "admin");
-    const result = await this.database.query<{
-      queued: string;
-      running: string;
-      awaiting_approval: string;
-      succeeded: string;
-      failed: string;
-      stale_running: string;
-      oldest_queued_seconds: string | null;
-    }>(
-      `SELECT
+    const [result, workers] = await Promise.all([
+      this.database.query<{
+        queued: string;
+        running: string;
+        awaiting_approval: string;
+        succeeded: string;
+        failed: string;
+        stale_running: string;
+        oldest_queued_seconds: string | null;
+      }>(
+        `SELECT
         count(*) FILTER (WHERE status = 'queued')::text AS queued,
         count(*) FILTER (WHERE status = 'running')::text AS running,
         count(*) FILTER (WHERE status = 'awaiting_approval')::text AS awaiting_approval,
@@ -221,8 +222,16 @@ export class AgentService {
         count(*) FILTER (WHERE status = 'running' AND locked_at < now() - interval '2 minutes')::text AS stale_running,
         extract(epoch FROM now() - min(created_at) FILTER (WHERE status = 'queued'))::text AS oldest_queued_seconds
        FROM agent.jobs WHERE workspace_id = $1 AND expires_at > now()`,
-      [workspaceId],
-    );
+        [workspaceId],
+      ),
+      this.database.query<{
+        active_workers: string;
+        processed_jobs: string;
+      }>(
+        `SELECT count(*)::text AS active_workers, COALESCE(sum(processed_jobs), 0)::text AS processed_jobs
+         FROM agent.worker_heartbeats WHERE heartbeat_at > now() - interval '10 seconds'`,
+      ),
+    ]);
     const value = result.rows[0]!;
     return {
       queued: Number(value.queued),
@@ -235,7 +244,25 @@ export class AgentService {
         value.oldest_queued_seconds === null
           ? null
           : Math.round(Number(value.oldest_queued_seconds)),
+      activeWorkers: Number(workers.rows[0]?.active_workers ?? 0),
+      workerProcessedJobs: Number(workers.rows[0]?.processed_jobs ?? 0),
     };
+  }
+
+  async heartbeat(workerId: string, processed = false) {
+    await this.database.query(
+      `INSERT INTO agent.worker_heartbeats (worker_id, processed_jobs) VALUES ($1, $2)
+       ON CONFLICT (worker_id) DO UPDATE SET heartbeat_at = now(),
+         processed_jobs = agent.worker_heartbeats.processed_jobs + $2`,
+      [workerId, processed ? 1 : 0],
+    );
+  }
+
+  async unregisterWorker(workerId: string) {
+    await this.database.query(
+      `DELETE FROM agent.worker_heartbeats WHERE worker_id = $1`,
+      [workerId],
+    );
   }
 
   async notifications(principalId: string, workspaceId: string) {

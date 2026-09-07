@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help doctor bootstrap onboard build-images infra-up up dev down logs check smoke phase1-test phase2-test phase3-test ai-up disk-audit disk-clean
+.PHONY: help doctor bootstrap onboard build-images infra-up up dev down logs check smoke phase1-test phase2-test phase3-test phase3-load-test ai-up disk-audit disk-clean
 
 help:
 	@echo "Maknyak Platform"
@@ -16,6 +16,7 @@ help:
 	@echo "  make phase1-test Verify tenant isolation and membership lifecycle"
 	@echo "  make phase2-test Verify tenant-scoped AI project brief lifecycle"
 	@echo "  make phase3-test Verify durable approval-gated agent lifecycle"
+	@echo "  make phase3-load-test Validate concurrent agent queue processing"
 	@echo "  make disk-audit Inspect root, home, Docker, and journal usage"
 	@echo "  make disk-clean Clean safe caches/logs (run with sudo)"
 
@@ -64,6 +65,9 @@ phase2-test:
 
 phase3-test:
 	./scripts/phase3-agent-test.sh
+
+phase3-load-test:
+	./scripts/phase3-load-test.sh
 
 disk-audit:
 	./scripts/disk-maintenance.sh audit

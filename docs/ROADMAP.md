@@ -46,7 +46,8 @@ Exit: pengguna menyelesaikan satu pekerjaan bernilai dengan kualitas terukur. Ba
 - [x] Human approval gate, one-time scoped capability grant, dan checksummed JSON artifact store.
 - [x] Project Planner agent pertama dengan structural evaluation regression suite.
 - [x] MinIO object storage, in-app approval notification, queue metrics, dan worker process terpisah yang dapat diskalakan.
-- Recovery drill multi-instance dan validasi penggunaan nyata sebelum production.
+- [x] Automated multi-instance recovery drill, worker heartbeat, dan bounded local concurrency test.
+- Validasi penggunaan nyata sebelum production.
 - QA atau coding agent berikutnya berdasarkan demand produk.
 
 Exit: agent menghemat waktu pengguna secara konsisten tanpa melanggar safety boundary. Status: vertical slice pertama tersedia; validasi penggunaan nyata dan operasi production masih diperlukan.

@@ -36,6 +36,8 @@ interface Operations {
   failedLast24Hours: number;
   staleRunning: number;
   oldestQueuedSeconds: number | null;
+  activeWorkers: number;
+  workerProcessedJobs: number;
 }
 interface Notification {
   id: string;
@@ -177,6 +179,9 @@ export function AgentJobsPanel({
           </span>
           <span>
             stale <strong>{operations.staleRunning}</strong>
+          </span>
+          <span>
+            workers <strong>{operations.activeWorkers}</strong>
           </span>
         </div>
       )}

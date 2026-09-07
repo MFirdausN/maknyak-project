@@ -13,11 +13,14 @@ df -h / /home
 make up
 make smoke
 make phase3-test
+make phase3-load-test
 ```
 
 Integration test membuktikan checkpoint `awaiting_approval`, tenant isolation,
 structural evaluation, approval gate dan notifikasi, artifact MinIO beserta
 checksum, trace context, revocation capability, serta recovery worker.
+Load test default membuat 20 job konkuren, memastikan masing-masing hanya
+dieksekusi sekali, mencatat jumlah worker aktif, lalu membatalkan data uji.
 
 ## Coba melalui dashboard
 
