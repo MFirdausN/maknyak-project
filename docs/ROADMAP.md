@@ -42,11 +42,13 @@ Exit: pengguna menyelesaikan satu pekerjaan bernilai dengan kualitas terukur. Ba
 
 ## Phase 3 — Agents
 
-- Durable job execution, approval gates, scoped credentials, artifact store.
-- QA atau coding agent pertama berdasarkan demand produk.
-- Evaluation suite dan human-in-the-loop operations.
+- [x] Durable PostgreSQL job queue, worker lease recovery, bounded retry, dan persisted steps.
+- [x] Human approval gate, one-time scoped capability grant, dan checksummed JSON artifact store.
+- [x] Project Planner agent pertama dengan structural evaluation regression suite.
+- Object storage untuk artifact besar, notification approval, dan operational queue dashboard.
+- QA atau coding agent berikutnya berdasarkan demand produk.
 
-Exit: agent menghemat waktu pengguna secara konsisten tanpa melanggar safety boundary.
+Exit: agent menghemat waktu pengguna secara konsisten tanpa melanggar safety boundary. Status: vertical slice pertama tersedia; validasi penggunaan nyata dan operasi production masih diperlukan.
 
 ## Phase 4 — Commercial product
 

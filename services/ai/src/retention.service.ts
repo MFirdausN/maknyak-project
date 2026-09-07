@@ -25,8 +25,12 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
       const conversations = await this.database.query(
         `DELETE FROM ai.conversations WHERE expires_at <= now()`,
       );
+      const agentJobs = await this.database.query(
+        `DELETE FROM agent.jobs WHERE expires_at <= now()`,
+      );
       const results = {
         conversations: conversations.rowCount ?? 0,
+        agentJobs: agentJobs.rowCount ?? 0,
         briefs:
           (
             await this.database.query(

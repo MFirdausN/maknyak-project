@@ -54,6 +54,7 @@ Keycloak `start-dev`, seeded password grant, dan kredensial di realm import hany
 - Structured logs memuat correlation ID, service, version, principal, serta workspace bila tersedia; tidak memuat token atau PII sensitif.
 - HTTP boundary menghasilkan dan meneruskan W3C `traceparent`. AI menyimpan trace ID pada run, message, dan tool request agar satu pekerjaan dapat ditelusuri lintas BFF, Gateway, dan service.
 - Tool AI tidak mengeksekusi kode arbitrer. Tool harus terdaftar pada allowlist, disimpan sebagai request `pending`, disetujui owner/admin, kemudian dieksekusi dengan query tenant-scoped.
+- Agent runtime mengklaim durable job dengan PostgreSQL `FOR UPDATE SKIP LOCKED`, menyimpan checkpoint per step, dan memulihkan lease stale. Side effect publish artifact hanya tersedia melalui capability grant terbatas yang diterbitkan setelah human approval dan direvoke setelah digunakan.
 - Backup PostgreSQL dan MinIO harus disertai restore drill.
 
 ## Evolusi deployment

@@ -343,10 +343,74 @@ button.danger {
 }
 .brief-loading,
 .brief-panel,
-.ai-workbench {
+.ai-workbench,
+.agent-panel {
   margin-top: 24px;
   border-top: 1px solid var(--line);
   padding-top: 24px;
+}
+.agent-goal {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  margin-top: 18px;
+}
+.agent-goal textarea {
+  min-height: 84px;
+}
+.agent-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(300px, 1.2fr);
+  gap: 16px;
+  margin-top: 18px;
+}
+.agent-jobs {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+}
+.agent-jobs button {
+  display: grid;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  text-align: left;
+}
+.agent-jobs button.active {
+  border-color: var(--lime);
+}
+.agent-jobs strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-jobs span,
+.agent-status span {
+  color: var(--muted);
+  font: 10px monospace;
+  text-transform: uppercase;
+}
+.agent-detail {
+  border: 1px solid var(--line);
+  min-height: 180px;
+  padding: 14px;
+}
+.agent-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.agent-detail pre {
+  overflow: auto;
+  max-height: 300px;
+  white-space: pre-wrap;
+}
+@media (max-width: 760px) {
+  .agent-layout,
+  .agent-goal {
+    grid-template-columns: 1fr;
+  }
 }
 .workbench-grid {
   display: grid;

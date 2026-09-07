@@ -45,6 +45,7 @@ pnpm security:audit
 make smoke     # verifikasi stack Docker yang sedang berjalan
 make phase1-test # tenant isolation, invitation, ownership, audit, dan outbox
 make phase2-test # AI project brief, streaming, pagination, usage, dan isolation
+make phase3-test # durable agent, approval, scoped capability, dan artifact
 make disk-audit
 sudo make disk-clean
 ```
@@ -86,6 +87,7 @@ Mulai dari [visi](docs/VISION.md), lalu baca [arsitektur](docs/ARCHITECTURE.md),
 Untuk mencoba fondasi awal, ikuti [panduan Phase 0](docs/TRY_PHASE_0.md).
 Untuk alur secure multi-tenancy terbaru, ikuti [panduan mencoba Phase 1](docs/TRY_PHASE_1.md).
 Baseline AI Project Brief tersedia di [panduan mencoba Phase 2](docs/TRY_PHASE_2.md).
+Durable Project Planner Agent tersedia di [panduan mencoba Phase 3](docs/TRY_PHASE_3.md).
 Strategi environment dan akses contributor dijelaskan dalam [branching policy](docs/BRANCHING.md).
 
 ## Struktur

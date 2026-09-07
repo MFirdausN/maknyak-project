@@ -17,6 +17,11 @@ const ProjectBriefPanel = lazy(() =>
 const AiWorkbench = lazy(() =>
   import("./ai-workbench").then((module) => ({ default: module.AiWorkbench })),
 );
+const AgentJobsPanel = lazy(() =>
+  import("./agent-jobs-panel").then((module) => ({
+    default: module.AgentJobsPanel,
+  })),
+);
 
 interface Session {
   authenticated: boolean;
@@ -471,6 +476,18 @@ export function WorkspaceConsole() {
                     }
                   >
                     <AiWorkbench
+                      workspaceId={selected.id}
+                      workspaceRole={selected.role}
+                      onSuccess={showSuccess}
+                      onError={showError}
+                    />
+                  </Suspense>
+                  <Suspense
+                    fallback={
+                      <div className="brief-loading">Memuat Agent Runtime…</div>
+                    }
+                  >
+                    <AgentJobsPanel
                       workspaceId={selected.id}
                       workspaceRole={selected.role}
                       onSuccess={showSuccess}

@@ -289,6 +289,71 @@ export class AiProxyController {
     );
   }
 
+  @Get("/agent-jobs")
+  agentJobs(
+    @CurrentPrincipal() p: AuthenticatedPrincipal,
+    @CurrentRequestId() r: string,
+    @Query() q: Record<string, string>,
+    @Headers("traceparent") t?: string,
+  ) {
+    return this.forward(
+      `/agent-jobs?${new URLSearchParams(q).toString()}`,
+      "GET",
+      p.id,
+      r,
+      undefined,
+      t,
+    );
+  }
+
+  @Post("/agent-jobs")
+  createAgentJob(
+    @CurrentPrincipal() p: AuthenticatedPrincipal,
+    @CurrentRequestId() r: string,
+    @Body() b: unknown,
+    @Headers("traceparent") t?: string,
+  ) {
+    return this.forward("/agent-jobs", "POST", p.id, r, b, t);
+  }
+
+  @Get("/agent-jobs/:id")
+  agentJob(
+    @CurrentPrincipal() p: AuthenticatedPrincipal,
+    @CurrentRequestId() r: string,
+    @Param("id") id: string,
+    @Headers("traceparent") t?: string,
+  ) {
+    return this.forward(
+      `/agent-jobs/${encodeURIComponent(id)}`,
+      "GET",
+      p.id,
+      r,
+      undefined,
+      t,
+    );
+  }
+
+  @Post("/agent-jobs/:id/:action")
+  agentAction(
+    @CurrentPrincipal() p: AuthenticatedPrincipal,
+    @CurrentRequestId() r: string,
+    @Param("id") id: string,
+    @Param("action") action: string,
+    @Body() body: unknown,
+    @Headers("traceparent") t?: string,
+  ) {
+    if (!["approve", "reject", "cancel"].includes(action))
+      throw new HttpException("Unknown agent action", 404);
+    return this.forward(
+      `/agent-jobs/${encodeURIComponent(id)}/${action}`,
+      "POST",
+      p.id,
+      r,
+      body,
+      t,
+    );
+  }
+
   private async forward(
     path: string,
     method: "GET" | "POST" | "PUT" | "DELETE",
