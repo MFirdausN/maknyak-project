@@ -12,6 +12,7 @@ interface Job {
   maxAttempts: number;
   output: unknown;
   createdAt: string;
+  agentKey: "project-planner-v1" | "qa-reviewer-v1";
 }
 interface JobDetail extends Job {
   steps: Array<{ id: string; name: string; status: string; attempt: number }>;
@@ -63,6 +64,8 @@ export function AgentJobsPanel({
   const [detail, setDetail] = useState<JobDetail | null>(null);
   const [operations, setOperations] = useState<Operations | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [agentKey, setAgentKey] =
+    useState<Job["agentKey"]>("project-planner-v1");
   const canApprove = workspaceRole === "owner" || workspaceRole === "admin";
   const refresh = useCallback(async () => {
     try {
@@ -106,7 +109,7 @@ export function AgentJobsPanel({
     try {
       const created = await mutate<Job>("/api/ai/agent-jobs", {
         workspaceId,
-        agentKey: "project-planner-v1",
+        agentKey,
         goal: new FormData(form).get("goal"),
       });
       form.reset();
@@ -149,17 +152,30 @@ export function AgentJobsPanel({
       <div className="brief-heading">
         <div>
           <small>PHASE 3 · DURABLE EXECUTION</small>
-          <h2>Project Planner Agent</h2>
+          <h2>Agent Workspace</h2>
         </div>
         <span>{data?.total ?? 0} job</span>
       </div>
       <form className="agent-goal" onSubmit={create}>
+        <select
+          value={agentKey}
+          onChange={(event) =>
+            setAgentKey(event.target.value as Job["agentKey"])
+          }
+        >
+          <option value="project-planner-v1">Project Planner</option>
+          <option value="qa-reviewer-v1">QA Reviewer</option>
+        </select>
         <textarea
           name="goal"
           minLength={20}
           maxLength={4000}
           required
-          placeholder="Jelaskan outcome yang ingin dicapai agent…"
+          placeholder={
+            agentKey === "qa-reviewer-v1"
+              ? "Jelaskan fitur, acceptance criteria, dan evidence yang perlu direview…"
+              : "Jelaskan outcome yang ingin dicapai agent…"
+          }
         />
         <button disabled={!canWrite}>Jalankan agent</button>
       </form>
@@ -221,7 +237,8 @@ export function AgentJobsPanel({
             >
               <strong>{job.goal}</strong>
               <span>
-                {job.status} · attempt {job.attempt}/{job.maxAttempts}
+                {job.agentKey.replace("-v1", "")} · {job.status} · attempt{" "}
+                {job.attempt}/{job.maxAttempts}
               </span>
             </button>
           ))}

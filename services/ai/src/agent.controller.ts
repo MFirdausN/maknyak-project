@@ -16,7 +16,9 @@ const uuid = z.string().uuid();
 const createSchema = z.object({
   workspaceId: uuid,
   goal: z.string().trim().min(20).max(4000),
-  agentKey: z.literal("project-planner-v1").default("project-planner-v1"),
+  agentKey: z
+    .enum(["project-planner-v1", "qa-reviewer-v1"])
+    .default("project-planner-v1"),
 });
 const listSchema = z.object({
   workspaceId: uuid,
@@ -40,6 +42,7 @@ export class AgentController {
       principal,
       input.workspaceId,
       input.goal,
+      input.agentKey,
       traceId,
     );
   }

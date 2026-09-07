@@ -4,7 +4,7 @@ set -euo pipefail
 compose_port() { docker compose port "$1" "$2" | awk -F: 'END { print $NF }'; }
 json_field() { node -e 'let i="";process.stdin.on("data",c=>i+=c);process.stdin.on("end",()=>{const p=process.argv[1].split(".");let v=JSON.parse(i);for(const k of p)v=v?.[k];if(v!=null)process.stdout.write(String(v))})' "$1"; }
 oidc_token() { curl --fail --silent --show-error -X POST "http://localhost:${keycloak_port}/realms/maknyak/protocol/openid-connect/token" -H 'content-type: application/x-www-form-urlencoded' --data-urlencode 'client_id=maknyak-cli' --data-urlencode "username=$1" --data-urlencode "password=$2" --data-urlencode 'grant_type=password' | json_field access_token; }
-request() { local token="$1" method="$2" path="$3" body="${4:-}"; local args=(--silent --show-error -X "$method" -H "authorization: Bearer ${token}" -H 'content-type: application/json' -H 'x-request-id: phase3-agent-test' -H 'traceparent: 00-33333333333333333333333333333333-4444444444444444-01'); [[ -z "$body" ]] || args+=(--data "$body"); curl "${args[@]}" "http://localhost:${gateway_port}/api/v1${path}"; }
+request() { local token="$1" method="$2" path="$3" body="${4:-}"; local args=(--fail-with-body --silent --show-error -X "$method" -H "authorization: Bearer ${token}" -H 'content-type: application/json' -H 'x-request-id: phase3-agent-test' -H 'traceparent: 00-33333333333333333333333333333333-4444444444444444-01'); [[ -z "$body" ]] || args+=(--data "$body"); curl "${args[@]}" "http://localhost:${gateway_port}/api/v1${path}"; }
 status() { local token="$1" method="$2" path="$3"; curl --silent --output /dev/null --write-out '%{http_code}' -X "$method" -H "authorization: Bearer ${token}" "http://localhost:${gateway_port}/api/v1${path}"; }
 wait_status() { local token="$1" job="$2" expected="$3"; for _ in {1..20}; do local payload current; payload="$(request "$token" GET "/ai/agent-jobs/${job}")"; current="$(json_field status <<<"$payload")"; [[ "$current" == "$expected" ]] && { printf '%s' "$payload"; return 0; }; sleep 1; done; echo "job ${job} did not reach ${expected}" >&2; return 1; }
 
@@ -49,6 +49,17 @@ echo "ok: one-time artifact capability is revoked"
 trace="$(docker compose exec -T postgres psql --tuples-only --no-align -U "${POSTGRES_USER:-maknyak}" -d "${POSTGRES_DB:-maknyak}" -c "SELECT trace_id FROM agent.jobs WHERE id = '${job_id}';")"
 [[ "$trace" == "33333333333333333333333333333333" ]] || { echo "agent trace context missing" >&2; exit 1; }
 echo "ok: agent job preserves distributed trace context"
+
+qa_created="$(request "$owner_token" POST /ai/agent-jobs "{\"workspaceId\":\"${workspace_id}\",\"agentKey\":\"qa-reviewer-v1\",\"goal\":\"Review invitation tenant isolation, approval behavior, and the available regression evidence.\"}")"
+qa_job_id="$(json_field id <<<"$qa_created")"
+qa_draft="$(wait_status "$owner_token" "$qa_job_id" awaiting_approval)"
+[[ "$qa_draft" == *'"evaluator":"qa-review-structural-v1"'* && "$qa_draft" == *'"score":100'* && "$qa_draft" == *'"verdict":"needs-evidence"'* ]] || { echo "QA review output is incomplete: ${qa_draft}" >&2; exit 1; }
+request "$owner_token" POST "/ai/agent-jobs/${qa_job_id}/approve" '{}' >/dev/null
+qa_completed="$(wait_status "$owner_token" "$qa_job_id" succeeded)"
+[[ "$qa_completed" == *'"storageBackend":"minio"'* ]] || { echo "QA artifact was not published: ${qa_completed}" >&2; exit 1; }
+qa_kind="$(docker compose exec -T postgres psql --tuples-only --no-align -U "${POSTGRES_USER:-maknyak}" -d "${POSTGRES_DB:-maknyak}" -c "SELECT kind FROM agent.artifacts WHERE job_id = '${qa_job_id}';")"
+[[ "$qa_kind" == "qa-report" ]] || { echo "unexpected QA artifact kind: ${qa_kind}" >&2; exit 1; }
+echo "ok: QA reviewer produces an evaluated approval-gated MinIO report"
 
 docker compose stop agent-worker >/dev/null
 recovery="$(request "$owner_token" POST /ai/agent-jobs "{\"workspaceId\":\"${workspace_id}\",\"agentKey\":\"project-planner-v1\",\"goal\":\"Recover this deliberately expired worker lease without duplicate execution.\"}")"

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createPlan } from "../src/agent.service";
+import { createPlan, createQaReview } from "../src/agent.service";
 
 const goals = [
   "Launch a tenant-safe customer feedback workflow with measurable adoption.",
@@ -16,3 +16,14 @@ for (const goal of goals) {
     assert.match(plan.approvalQuestion, /\?$/);
   });
 }
+
+test("QA reviewer produces a risk-based gated report", () => {
+  const report = createQaReview(
+    "Review tenant invitation acceptance, authorization boundaries, and regression evidence.",
+  );
+  assert.equal(report.evaluation.score, 100);
+  assert.equal(report.verdict, "needs-evidence");
+  assert.ok(report.testStrategy.length >= 3);
+  assert.ok(report.risks.some((risk) => risk.severity === "high"));
+  assert.match(report.approvalQuestion, /\?$/);
+});

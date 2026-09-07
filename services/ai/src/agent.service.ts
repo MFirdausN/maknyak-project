@@ -15,7 +15,7 @@ interface JobRow {
   id: string;
   workspace_id: string;
   requested_by: string;
-  agent_key: string;
+  agent_key: AgentKey;
   goal: string;
   input: Record<string, unknown>;
   output: unknown;
@@ -29,6 +29,7 @@ interface JobRow {
   updated_at: Date;
   completed_at: Date | null;
 }
+type AgentKey = "project-planner-v1" | "qa-reviewer-v1";
 interface StepRow {
   id: string;
   name: string;
@@ -64,14 +65,15 @@ export class AgentService {
     principalId: string,
     workspaceId: string,
     goal: string,
+    agentKey: AgentKey,
     traceId?: string,
   ) {
     await this.authorize(principalId, workspaceId, "member");
     const retention = await this.retentionDays(workspaceId);
     const result = await this.database.query<JobRow>(
       `INSERT INTO agent.jobs (workspace_id, requested_by, agent_key, goal, trace_id, expires_at)
-       VALUES ($1, $2, 'project-planner-v1', $3, $4, now() + make_interval(days => $5)) RETURNING *`,
-      [workspaceId, principalId, goal, traceId ?? null, retention],
+       VALUES ($1, $2, $3, $4, $5, now() + make_interval(days => $6)) RETURNING *`,
+      [workspaceId, principalId, agentKey, goal, traceId ?? null, retention],
     );
     return job(result.rows[0]!);
   }
@@ -337,7 +339,12 @@ export class AgentService {
   }
 
   private async execute(row: JobRow) {
-    const stepName = row.phase === "plan" ? "create-plan" : "publish-artifact";
+    const stepName =
+      row.phase === "finalize"
+        ? "publish-artifact"
+        : row.agent_key === "qa-reviewer-v1"
+          ? "review-quality"
+          : "create-plan";
     const started = await this.database.query<{ id: string }>(
       `INSERT INTO agent.steps (job_id, workspace_id, name, status, attempt, input) VALUES ($1, $2, $3, 'running', $4, $5::jsonb) RETURNING id`,
       [
@@ -351,19 +358,19 @@ export class AgentService {
     const stepId = started.rows[0]!.id;
     try {
       if (row.phase === "plan") {
-        const plan = createPlan(row.goal);
+        const draft = createAgentDraft(row.agent_key, row.goal);
         await this.database.query(
           `UPDATE agent.steps SET status = 'succeeded', output = $2::jsonb, completed_at = now() WHERE id = $1`,
-          [stepId, JSON.stringify(plan)],
+          [stepId, JSON.stringify(draft)],
         );
         await this.database.query(
           `WITH updated AS (
              UPDATE agent.jobs SET status = 'awaiting_approval', output = $2::jsonb, locked_at = NULL, locked_by = NULL, updated_at = now()
              WHERE id = $1 AND status = 'running' RETURNING id, workspace_id, expires_at
            ) INSERT INTO agent.notifications (workspace_id, job_id, kind, minimum_role, title, expires_at)
-             SELECT workspace_id, id, 'approval_required', 'admin', 'Agent plan requires approval', expires_at FROM updated
+             SELECT workspace_id, id, 'approval_required', 'admin', $3, expires_at FROM updated
              ON CONFLICT (job_id, kind) DO NOTHING`,
-          [row.id, JSON.stringify({ draft: plan })],
+          [row.id, JSON.stringify({ draft }), approvalTitle(row.agent_key)],
         );
       } else {
         await this.publishArtifact(row, stepId);
@@ -402,15 +409,17 @@ export class AgentService {
     if (!content) throw new Error("Approved plan draft is missing");
     const encoded = JSON.stringify(content);
     const checksum = createHash("sha256").update(encoded).digest("hex");
-    const objectKey = `${row.workspace_id}/${row.id}/${checksum}.json`;
+    const objectKey = `${row.workspace_id}/${row.agent_key}/${row.id}/${checksum}.json`;
+    const artifactKind =
+      row.agent_key === "qa-reviewer-v1" ? "qa-report" : "project-plan";
     await this.objects.put(objectKey, encoded);
     const client = await this.database.connect();
     try {
       await client.query("BEGIN");
       const artifactResult = await client.query<{ id: string }>(
         `INSERT INTO agent.artifacts (job_id, workspace_id, kind, name, content, storage_backend, object_key, size_bytes, checksum_sha256, expires_at)
-         SELECT id, workspace_id, 'project-plan', left(goal, 150), NULL, 'minio', $2, $3, $4, expires_at FROM agent.jobs WHERE id = $1 RETURNING id`,
-        [row.id, objectKey, Buffer.byteLength(encoded), checksum],
+         SELECT id, workspace_id, $2, left(goal, 150), NULL, 'minio', $3, $4, $5, expires_at FROM agent.jobs WHERE id = $1 RETURNING id`,
+        [row.id, artifactKind, objectKey, Buffer.byteLength(encoded), checksum],
       );
       await client.query(
         `UPDATE agent.steps SET status = 'succeeded', output = $2::jsonb, completed_at = now() WHERE id = $1`,
@@ -506,6 +515,68 @@ export function createPlan(goal: string) {
     approvalQuestion: "Approve publishing this project plan artifact?",
   };
   return { ...plan, evaluation: evaluateAgentPlan(plan) };
+}
+export function createQaReview(goal: string) {
+  const report = {
+    scope: goal,
+    verdict: "needs-evidence" as const,
+    testStrategy: [
+      "Verify the primary acceptance path with reproducible evidence",
+      "Exercise authorization and tenant-isolation boundaries",
+      "Test failure, retry, and recovery behavior",
+    ],
+    risks: [
+      {
+        severity: "high",
+        finding: "Acceptance evidence has not been attached",
+      },
+      {
+        severity: "medium",
+        finding: "Regression impact requires explicit verification",
+      },
+    ],
+    evidenceGaps: [
+      "Automated test result",
+      "Observed result versus acceptance criteria",
+    ],
+    releaseRecommendation:
+      "Hold release until high-severity evidence gaps are resolved",
+    approvalQuestion: "Approve publishing this QA review artifact?",
+  };
+  return { ...report, evaluation: evaluateQaReview(report) };
+}
+export function evaluateQaReview(report: {
+  scope: string;
+  testStrategy: string[];
+  risks: Array<{ severity: string; finding: string }>;
+  evidenceGaps: string[];
+  releaseRecommendation: string;
+  approvalQuestion: string;
+}) {
+  const checks = {
+    meaningfulScope: report.scope.trim().length >= 20,
+    riskBasedStrategy:
+      report.testStrategy.length >= 3 && report.risks.length > 0,
+    evidenceAware: report.evidenceGaps.length > 0,
+    explicitDecision:
+      report.releaseRecommendation.length > 10 &&
+      report.approvalQuestion.endsWith("?"),
+  };
+  return {
+    evaluator: "qa-review-structural-v1",
+    score: Object.values(checks).filter(Boolean).length * 25,
+    checks,
+  };
+}
+function createAgentDraft(agentKey: AgentKey, goal: string) {
+  return agentKey === "qa-reviewer-v1"
+    ? createQaReview(goal)
+    : createPlan(goal);
+}
+function approvalTitle(agentKey: AgentKey) {
+  return agentKey === "qa-reviewer-v1"
+    ? "QA report requires approval"
+    : "Agent plan requires approval";
 }
 export function evaluateAgentPlan(plan: {
   summary: string;

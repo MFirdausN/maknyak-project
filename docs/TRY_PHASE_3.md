@@ -25,8 +25,9 @@ dieksekusi sekali, mencatat jumlah worker aktif, lalu membatalkan data uji.
 ## Coba melalui dashboard
 
 1. Buka <http://localhost:13003> dan login sebagai `developer`.
-2. Pilih workspace dan temukan panel **Project Planner Agent**.
-3. Masukkan goal minimal 20 karakter, lalu klik **Jalankan agent**.
+2. Pilih workspace dan temukan panel **Agent Workspace**.
+3. Pilih **Project Planner** atau **QA Reviewer**, masukkan goal minimal 20
+   karakter, lalu klik **Jalankan agent**.
 4. Job berpindah `queued` → `running` → `awaiting_approval`. Tampilan
    tersinkron otomatis setiap tiga detik.
 5. Tinjau draft dan langkah yang tersimpan. Owner/admin dapat memilih
@@ -57,3 +58,8 @@ Project Planner adalah agent pertama, bukan coding agent. Runtime tidak memberi
 akses shell, repository, credential pihak ketiga, atau network. Backup/restore,
 observability eksternal, dan validasi beban nyata tetap diperlukan sebelum
 klaim production-ready.
+
+QA Reviewer menerima deskripsi fitur, acceptance criteria, dan evidence sebagai
+teks. Ia menghasilkan strategi uji berbasis risiko, evidence gaps, serta release
+recommendation. Versi ini tidak menjalankan test atau membaca repository secara
+otomatis; setiap report tetap membutuhkan approval owner/admin.
