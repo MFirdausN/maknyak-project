@@ -316,6 +316,57 @@ export class AiProxyController {
     return this.forward("/agent-jobs", "POST", p.id, r, b, t);
   }
 
+  @Get("/agent-jobs/operations")
+  agentOperations(
+    @CurrentPrincipal() p: AuthenticatedPrincipal,
+    @CurrentRequestId() r: string,
+    @Query() q: Record<string, string>,
+    @Headers("traceparent") t?: string,
+  ) {
+    return this.forward(
+      `/agent-jobs/operations?${new URLSearchParams(q).toString()}`,
+      "GET",
+      p.id,
+      r,
+      undefined,
+      t,
+    );
+  }
+
+  @Get("/agent-jobs/notifications")
+  agentNotifications(
+    @CurrentPrincipal() p: AuthenticatedPrincipal,
+    @CurrentRequestId() r: string,
+    @Query() q: Record<string, string>,
+    @Headers("traceparent") t?: string,
+  ) {
+    return this.forward(
+      `/agent-jobs/notifications?${new URLSearchParams(q).toString()}`,
+      "GET",
+      p.id,
+      r,
+      undefined,
+      t,
+    );
+  }
+
+  @Post("/agent-jobs/notifications/:id/read")
+  readAgentNotification(
+    @CurrentPrincipal() p: AuthenticatedPrincipal,
+    @CurrentRequestId() r: string,
+    @Param("id") id: string,
+    @Headers("traceparent") t?: string,
+  ) {
+    return this.forward(
+      `/agent-jobs/notifications/${encodeURIComponent(id)}/read`,
+      "POST",
+      p.id,
+      r,
+      {},
+      t,
+    );
+  }
+
   @Get("/agent-jobs/:id")
   agentJob(
     @CurrentPrincipal() p: AuthenticatedPrincipal,

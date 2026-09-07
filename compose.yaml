@@ -117,6 +117,10 @@ services:
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-in-every-environment}
       OLLAMA_URL: http://ollama:11434
       AI_ENABLE_OLLAMA: ${AI_ENABLE_OLLAMA:-false}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-maknyak}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-maknyak_local_secret}
+      AGENT_ARTIFACT_BUCKET: ${AGENT_ARTIFACT_BUCKET:-maknyak-agent-artifacts}
     init: true
     ports:
       - "127.0.0.1:${AI_HOST_PORT:-3004}:3004"
@@ -124,6 +128,8 @@ services:
       migrate:
         condition: service_completed_successfully
       workspace:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     healthcheck:
       test:
@@ -136,6 +142,27 @@ services:
       interval: 5s
       timeout: 3s
       retries: 15
+    restart: unless-stopped
+
+  agent-worker:
+    image: maknyak-platform-runtime:latest
+    command: ["node", "services/ai/dist/src/worker.main.js"]
+    environment:
+      DATABASE_URL: postgresql://${AI_DB_USER:-maknyak_ai}:${AI_DB_PASSWORD:-ai_local}@postgres:5432/${POSTGRES_DB:-maknyak}
+      WORKSPACE_URL: http://workspace:3002
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-in-every-environment}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-maknyak}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-maknyak_local_secret}
+      AGENT_ARTIFACT_BUCKET: ${AGENT_ARTIFACT_BUCKET:-maknyak-agent-artifacts}
+    init: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      workspace:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     restart: unless-stopped
 
   migrate:

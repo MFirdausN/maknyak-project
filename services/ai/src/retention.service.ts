@@ -2,13 +2,17 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import type { Pool } from "pg";
 import { DATABASE } from "./database";
+import { ObjectStore } from "./object-store";
 
 @Injectable()
 export class RetentionService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RetentionService.name);
   private timer?: NodeJS.Timeout;
 
-  constructor(@Inject(DATABASE) private readonly database: Pool) {}
+  constructor(
+    @Inject(DATABASE) private readonly database: Pool,
+    @Inject(ObjectStore) private readonly objects: ObjectStore,
+  ) {}
 
   onModuleInit(): void {
     void this.cleanup();
@@ -24,6 +28,14 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
     try {
       const conversations = await this.database.query(
         `DELETE FROM ai.conversations WHERE expires_at <= now()`,
+      );
+      const expiredObjects = await this.database.query<{ object_key: string }>(
+        `SELECT object_key FROM agent.artifacts WHERE expires_at <= now() AND storage_backend = 'minio' AND object_key IS NOT NULL`,
+      );
+      await Promise.all(
+        expiredObjects.rows.map((row) =>
+          this.objects.delete(row.object_key).catch(() => undefined),
+        ),
       );
       const agentJobs = await this.database.query(
         `DELETE FROM agent.jobs WHERE expires_at <= now()`,

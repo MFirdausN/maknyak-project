@@ -8,7 +8,7 @@ import { GovernanceController } from "./governance.controller";
 import { GovernanceService } from "./governance.service";
 import { AgentController } from "./agent.controller";
 import { AgentService } from "./agent.service";
-import { AgentWorker } from "./agent.worker";
+import { ObjectStore } from "./object-store";
 
 @Module({
   controllers: [BriefController, GovernanceController, AgentController],
@@ -19,7 +19,7 @@ import { AgentWorker } from "./agent.worker";
     RetentionService,
     GovernanceService,
     AgentService,
-    AgentWorker,
+    ObjectStore,
   ],
 })
 export class AppModule {}

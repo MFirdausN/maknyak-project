@@ -16,8 +16,8 @@ make phase3-test
 ```
 
 Integration test membuktikan checkpoint `awaiting_approval`, tenant isolation,
-structural evaluation, approval gate, artifact checksum, trace context, serta
-revocation capability setelah digunakan.
+structural evaluation, approval gate dan notifikasi, artifact MinIO beserta
+checksum, trace context, revocation capability, serta recovery worker.
 
 ## Coba melalui dashboard
 
@@ -30,6 +30,8 @@ revocation capability setelah digunakan.
    **Approve & publish** atau **Reject**.
 6. Setelah approval, worker menggunakan capability `artifact.write`, membuat
    artifact JSON beserta checksum SHA-256, lalu merevoke capability tersebut.
+7. Owner/admin melihat metrik antrean dan notifikasi approval pada panel yang
+   tersinkron otomatis.
 
 Job menggunakan pagination server-side 10 data per halaman. Viewer hanya dapat
 membaca. Member dapat membuat/cancel job miliknya; owner/admin menangani
@@ -42,14 +44,13 @@ dapat berbagi antrean tanpa mengklaim job yang sama. Job `running` dengan lease
 lebih dari dua menit dipulihkan ketika service dimulai. Kegagalan step dijadwal
 ulang dengan backoff lima detik per attempt dan berhenti setelah tiga attempt.
 
-Artifact awal disimpan sebagai JSON maksimal 256 KiB di PostgreSQL. Ini sengaja
-menjaga vertical slice ringan. Artifact besar harus dipindahkan ke object
-storage MinIO pada iterasi Phase 3 berikutnya; database hanya menyimpan metadata,
-policy, checksum, dan object key.
+Artifact disimpan di bucket MinIO `maknyak-agent-artifacts`. PostgreSQL hanya
+menyimpan metadata, policy, checksum, dan object key. API mengambil isi artifact
+setelah pemeriksaan akses tenant, sehingga bucket tidak perlu dibuka ke browser.
 
 ## Batas fase saat ini
 
-Project Planner adalah agent pertama, bukan coding agent. Runtime belum memberi
-akses shell, repository, credential pihak ketiga, atau network. Notification
-approval, artifact object storage, queue administration, dan recovery drill
-multi-instance adalah pekerjaan berikutnya sebelum klaim production-ready.
+Project Planner adalah agent pertama, bukan coding agent. Runtime tidak memberi
+akses shell, repository, credential pihak ketiga, atau network. Backup/restore,
+observability eksternal, dan validasi beban nyata tetap diperlukan sebelum
+klaim production-ready.

@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import type { Pool } from "pg";
 import { DATABASE } from "./database";
+import { ObjectStore } from "./object-store";
 
 interface JobRow {
   id: string;
@@ -44,7 +45,9 @@ interface ArtifactRow {
   kind: string;
   name: string;
   media_type: string;
-  content: unknown;
+  content: unknown | null;
+  storage_backend: "postgres" | "minio";
+  object_key: string | null;
   size_bytes: number;
   checksum_sha256: string;
   created_at: Date;
@@ -52,7 +55,10 @@ interface ArtifactRow {
 
 @Injectable()
 export class AgentService {
-  constructor(@Inject(DATABASE) private readonly database: Pool) {}
+  constructor(
+    @Inject(DATABASE) private readonly database: Pool,
+    @Inject(ObjectStore) private readonly objects: ObjectStore,
+  ) {}
 
   async create(
     principalId: string,
@@ -109,7 +115,16 @@ export class AgentService {
     return {
       ...job(row),
       steps: steps.rows.map(step),
-      artifacts: artifacts.rows.map(artifact),
+      artifacts: await Promise.all(
+        artifacts.rows.map(async (row) =>
+          artifact(
+            row,
+            row.storage_backend === "minio" && row.object_key
+              ? JSON.parse(await this.objects.get(row.object_key))
+              : row.content,
+          ),
+        ),
+      ),
     };
   }
 
@@ -129,6 +144,11 @@ export class AgentService {
       await client.query(
         `INSERT INTO agent.approvals (job_id, workspace_id, decision, decided_by, note) VALUES ($1, $2, $3, $4, $5)`,
         [jobId, row.workspace_id, decision, principalId, note ?? null],
+      );
+      await client.query(
+        `UPDATE agent.notifications SET read_by = array_append(read_by, $2::uuid)
+         WHERE job_id = $1 AND kind = 'approval_required' AND NOT ($2::uuid = ANY(read_by))`,
+        [jobId, principalId],
       );
       if (decision === "approved") {
         await client.query(
@@ -179,6 +199,84 @@ export class AgentService {
        WHERE status = 'running' AND locked_at < now() - interval '2 minutes'`,
     );
     return result.rowCount ?? 0;
+  }
+
+  async operations(principalId: string, workspaceId: string) {
+    await this.authorize(principalId, workspaceId, "admin");
+    const result = await this.database.query<{
+      queued: string;
+      running: string;
+      awaiting_approval: string;
+      succeeded: string;
+      failed: string;
+      stale_running: string;
+      oldest_queued_seconds: string | null;
+    }>(
+      `SELECT
+        count(*) FILTER (WHERE status = 'queued')::text AS queued,
+        count(*) FILTER (WHERE status = 'running')::text AS running,
+        count(*) FILTER (WHERE status = 'awaiting_approval')::text AS awaiting_approval,
+        count(*) FILTER (WHERE status = 'succeeded')::text AS succeeded,
+        count(*) FILTER (WHERE status = 'failed' AND updated_at > now() - interval '24 hours')::text AS failed,
+        count(*) FILTER (WHERE status = 'running' AND locked_at < now() - interval '2 minutes')::text AS stale_running,
+        extract(epoch FROM now() - min(created_at) FILTER (WHERE status = 'queued'))::text AS oldest_queued_seconds
+       FROM agent.jobs WHERE workspace_id = $1 AND expires_at > now()`,
+      [workspaceId],
+    );
+    const value = result.rows[0]!;
+    return {
+      queued: Number(value.queued),
+      running: Number(value.running),
+      awaitingApproval: Number(value.awaiting_approval),
+      succeeded: Number(value.succeeded),
+      failedLast24Hours: Number(value.failed),
+      staleRunning: Number(value.stale_running),
+      oldestQueuedSeconds:
+        value.oldest_queued_seconds === null
+          ? null
+          : Math.round(Number(value.oldest_queued_seconds)),
+    };
+  }
+
+  async notifications(principalId: string, workspaceId: string) {
+    await this.authorize(principalId, workspaceId, "admin");
+    const result = await this.database.query<{
+      id: string;
+      job_id: string;
+      kind: string;
+      title: string;
+      read: boolean;
+      created_at: Date;
+    }>(
+      `SELECT id, job_id, kind, title, ($2::uuid = ANY(read_by)) AS read, created_at
+       FROM agent.notifications WHERE workspace_id = $1 AND expires_at > now()
+       ORDER BY created_at DESC, id DESC LIMIT 50`,
+      [workspaceId, principalId],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      jobId: row.job_id,
+      kind: row.kind,
+      title: row.title,
+      read: row.read,
+      createdAt: row.created_at.toISOString(),
+    }));
+  }
+
+  async readNotification(principalId: string, notificationId: string) {
+    const found = await this.database.query<{ workspace_id: string }>(
+      `SELECT workspace_id FROM agent.notifications WHERE id = $1 AND expires_at > now()`,
+      [notificationId],
+    );
+    if (!found.rows[0])
+      throw new NotFoundException("Agent notification not found");
+    await this.authorize(principalId, found.rows[0].workspace_id, "admin");
+    await this.database.query(
+      `UPDATE agent.notifications SET read_by = array_append(read_by, $2::uuid)
+       WHERE id = $1 AND NOT ($2::uuid = ANY(read_by))`,
+      [notificationId, principalId],
+    );
+    return { id: notificationId, read: true };
   }
 
   async processNext(workerId: string): Promise<boolean> {
@@ -232,7 +330,12 @@ export class AgentService {
           [stepId, JSON.stringify(plan)],
         );
         await this.database.query(
-          `UPDATE agent.jobs SET status = 'awaiting_approval', output = $2::jsonb, locked_at = NULL, locked_by = NULL, updated_at = now() WHERE id = $1 AND status = 'running'`,
+          `WITH updated AS (
+             UPDATE agent.jobs SET status = 'awaiting_approval', output = $2::jsonb, locked_at = NULL, locked_by = NULL, updated_at = now()
+             WHERE id = $1 AND status = 'running' RETURNING id, workspace_id, expires_at
+           ) INSERT INTO agent.notifications (workspace_id, job_id, kind, minimum_role, title, expires_at)
+             SELECT workspace_id, id, 'approval_required', 'admin', 'Agent plan requires approval', expires_at FROM updated
+             ON CONFLICT (job_id, kind) DO NOTHING`,
           [row.id, JSON.stringify({ draft: plan })],
         );
       } else {
@@ -249,6 +352,13 @@ export class AgentService {
           locked_at = NULL, locked_by = NULL, updated_at = now(), completed_at = CASE WHEN $2 = 'failed' THEN now() ELSE NULL END WHERE id = $1`,
         [row.id, retry ? "queued" : "failed", row.attempt],
       );
+      if (!retry)
+        await this.database.query(
+          `INSERT INTO agent.notifications (workspace_id, job_id, kind, minimum_role, title, expires_at)
+           SELECT workspace_id, id, 'job_failed', 'admin', 'Agent job failed after retries', expires_at FROM agent.jobs WHERE id = $1
+           ON CONFLICT (job_id, kind) DO NOTHING`,
+          [row.id],
+        );
     }
   }
 
@@ -265,13 +375,15 @@ export class AgentService {
     if (!content) throw new Error("Approved plan draft is missing");
     const encoded = JSON.stringify(content);
     const checksum = createHash("sha256").update(encoded).digest("hex");
+    const objectKey = `${row.workspace_id}/${row.id}/${checksum}.json`;
+    await this.objects.put(objectKey, encoded);
     const client = await this.database.connect();
     try {
       await client.query("BEGIN");
       const artifactResult = await client.query<{ id: string }>(
-        `INSERT INTO agent.artifacts (job_id, workspace_id, kind, name, content, size_bytes, checksum_sha256, expires_at)
-         SELECT id, workspace_id, 'project-plan', left(goal, 150), $2::jsonb, $3, $4, expires_at FROM agent.jobs WHERE id = $1 RETURNING id`,
-        [row.id, encoded, Buffer.byteLength(encoded), checksum],
+        `INSERT INTO agent.artifacts (job_id, workspace_id, kind, name, content, storage_backend, object_key, size_bytes, checksum_sha256, expires_at)
+         SELECT id, workspace_id, 'project-plan', left(goal, 150), NULL, 'minio', $2, $3, $4, expires_at FROM agent.jobs WHERE id = $1 RETURNING id`,
+        [row.id, objectKey, Buffer.byteLength(encoded), checksum],
       );
       await client.query(
         `UPDATE agent.steps SET status = 'succeeded', output = $2::jsonb, completed_at = now() WHERE id = $1`,
@@ -279,6 +391,12 @@ export class AgentService {
           stepId,
           JSON.stringify({ artifactId: artifactResult.rows[0]!.id, checksum }),
         ],
+      );
+      await client.query(
+        `INSERT INTO agent.notifications (workspace_id, job_id, kind, minimum_role, title, expires_at)
+         SELECT workspace_id, id, 'job_completed', 'viewer', 'Agent artifact is ready', expires_at FROM agent.jobs WHERE id = $1
+         ON CONFLICT (job_id, kind) DO NOTHING`,
+        [row.id],
       );
       await client.query(
         `UPDATE agent.jobs SET status = 'succeeded', output = $2::jsonb, completed_at = now(), updated_at = now(), locked_at = NULL, locked_by = NULL WHERE id = $1`,
@@ -294,6 +412,7 @@ export class AgentService {
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK");
+      await this.objects.delete(objectKey).catch(() => undefined);
       throw error;
     } finally {
       client.release();
@@ -406,13 +525,14 @@ const step = (row: StepRow) => ({
   startedAt: row.started_at.toISOString(),
   completedAt: row.completed_at?.toISOString() ?? null,
 });
-const artifact = (row: ArtifactRow) => ({
+const artifact = (row: ArtifactRow, content: unknown) => ({
   id: row.id,
   jobId: row.job_id,
   kind: row.kind,
   name: row.name,
   mediaType: row.media_type,
-  content: row.content,
+  content,
+  storageBackend: row.storage_backend,
   sizeBytes: row.size_bytes,
   checksumSha256: row.checksum_sha256,
   createdAt: row.created_at.toISOString(),

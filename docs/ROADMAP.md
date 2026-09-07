@@ -45,7 +45,8 @@ Exit: pengguna menyelesaikan satu pekerjaan bernilai dengan kualitas terukur. Ba
 - [x] Durable PostgreSQL job queue, worker lease recovery, bounded retry, dan persisted steps.
 - [x] Human approval gate, one-time scoped capability grant, dan checksummed JSON artifact store.
 - [x] Project Planner agent pertama dengan structural evaluation regression suite.
-- Object storage untuk artifact besar, notification approval, dan operational queue dashboard.
+- [x] MinIO object storage, in-app approval notification, queue metrics, dan worker process terpisah yang dapat diskalakan.
+- Recovery drill multi-instance dan validasi penggunaan nyata sebelum production.
 - QA atau coding agent berikutnya berdasarkan demand produk.
 
 Exit: agent menghemat waktu pengguna secara konsisten tanpa melanggar safety boundary. Status: vertical slice pertama tersedia; validasi penggunaan nyata dan operasi production masih diperlukan.

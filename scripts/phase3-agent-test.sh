@@ -20,6 +20,12 @@ draft="$(wait_status "$owner_token" "$job_id" awaiting_approval)"
 [[ "$draft" == *'"score":100'* ]] || { echo "agent evaluation missing: ${draft}" >&2; exit 1; }
 echo "ok: durable worker creates an evaluated checkpoint"
 
+notifications="$(request "$owner_token" GET "/ai/agent-jobs/notifications?workspaceId=${workspace_id}")"
+notification_id="$(json_field 0.id <<<"$notifications")"
+[[ -n "$notification_id" && "$notifications" == *'"approval_required"'* ]] || { echo "approval notification missing" >&2; exit 1; }
+request "$owner_token" POST "/ai/agent-jobs/notifications/${notification_id}/read" '{}' >/dev/null
+echo "ok: approval notification is delivered and can be marked read"
+
 [[ "$(status "$outsider_token" GET "/ai/agent-jobs/${job_id}")" == "403" ]] || { echo "outsider accessed tenant agent job" >&2; exit 1; }
 echo "ok: agent job is tenant isolated"
 
@@ -28,6 +34,14 @@ completed="$(wait_status "$owner_token" "$job_id" succeeded)"
 [[ "$completed" == *'"checksumSha256"'* && "$completed" == *'"publish-artifact"'* ]] || { echo "artifact or durable steps missing: ${completed}" >&2; exit 1; }
 echo "ok: approval grants scoped capability and publishes checksummed artifact"
 
+stored="$(docker compose exec -T postgres psql --tuples-only --no-align -U "${POSTGRES_USER:-maknyak}" -d "${POSTGRES_DB:-maknyak}" -c "SELECT storage_backend || ':' || (object_key IS NOT NULL)::text || ':' || (content IS NULL)::text FROM agent.artifacts WHERE job_id = '${job_id}';")"
+[[ "$stored" == "minio:true:true" ]] || { echo "artifact was not externalized to MinIO: ${stored}" >&2; exit 1; }
+echo "ok: artifact content is in MinIO while PostgreSQL retains metadata"
+
+operations="$(request "$owner_token" GET "/ai/agent-jobs/operations?workspaceId=${workspace_id}")"
+[[ "$operations" == *'"staleRunning":0'* ]] || { echo "queue operations unavailable: ${operations}" >&2; exit 1; }
+echo "ok: tenant-scoped queue operations are observable"
+
 revoked="$(docker compose exec -T postgres psql --tuples-only --no-align -U "${POSTGRES_USER:-maknyak}" -d "${POSTGRES_DB:-maknyak}" -c "SELECT count(*) FROM agent.capability_grants WHERE job_id = '${job_id}' AND revoked_at IS NOT NULL;")"
 [[ "$revoked" == "1" ]] || { echo "capability was not revoked after use" >&2; exit 1; }
 echo "ok: one-time artifact capability is revoked"
@@ -35,3 +49,13 @@ echo "ok: one-time artifact capability is revoked"
 trace="$(docker compose exec -T postgres psql --tuples-only --no-align -U "${POSTGRES_USER:-maknyak}" -d "${POSTGRES_DB:-maknyak}" -c "SELECT trace_id FROM agent.jobs WHERE id = '${job_id}';")"
 [[ "$trace" == "33333333333333333333333333333333" ]] || { echo "agent trace context missing" >&2; exit 1; }
 echo "ok: agent job preserves distributed trace context"
+
+docker compose stop agent-worker >/dev/null
+recovery="$(request "$owner_token" POST /ai/agent-jobs "{\"workspaceId\":\"${workspace_id}\",\"agentKey\":\"project-planner-v1\",\"goal\":\"Recover this deliberately expired worker lease without duplicate execution.\"}")"
+recovery_id="$(json_field id <<<"$recovery")"
+docker compose exec -T postgres psql -U "${POSTGRES_USER:-maknyak}" -d "${POSTGRES_DB:-maknyak}" -c "UPDATE agent.jobs SET status = 'running', attempt = 1, locked_at = now() - interval '3 minutes', locked_by = 'dead-worker' WHERE id = '${recovery_id}';" >/dev/null
+docker compose up -d --scale agent-worker=2 agent-worker >/dev/null
+wait_status "$owner_token" "$recovery_id" awaiting_approval >/dev/null
+steps="$(docker compose exec -T postgres psql --tuples-only --no-align -U "${POSTGRES_USER:-maknyak}" -d "${POSTGRES_DB:-maknyak}" -c "SELECT count(*) FROM agent.steps WHERE job_id = '${recovery_id}' AND name = 'create-plan';")"
+[[ "$steps" == "1" ]] || { echo "multi-worker recovery duplicated execution: ${steps}" >&2; exit 1; }
+echo "ok: two workers recover an expired lease without duplicate execution"

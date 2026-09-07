@@ -358,6 +358,31 @@ button.danger {
 .agent-goal textarea {
   min-height: 84px;
 }
+.agent-metrics,
+.agent-notifications {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.agent-metrics span,
+.agent-notifications button {
+  border: 1px solid var(--line);
+  padding: 7px 9px;
+  font: 10px monospace;
+  text-transform: uppercase;
+}
+.agent-notifications button {
+  display: grid;
+  gap: 3px;
+  text-align: left;
+}
+.agent-notifications button.read {
+  opacity: 0.55;
+}
+.agent-notifications small {
+  color: var(--muted);
+}
 .agent-layout {
   display: grid;
   grid-template-columns: minmax(220px, 0.8fr) minmax(300px, 1.2fr);

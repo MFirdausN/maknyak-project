@@ -48,6 +48,24 @@ export class AgentController {
     const input = parse(listSchema, query);
     return this.agents.list(principal, input.workspaceId, input.page);
   }
+  @Get("operations")
+  operations(
+    @PrincipalId() principal: string,
+    @Query("workspaceId") workspaceId: string,
+  ) {
+    return this.agents.operations(principal, parse(uuid, workspaceId));
+  }
+  @Get("notifications")
+  notifications(
+    @PrincipalId() principal: string,
+    @Query("workspaceId") workspaceId: string,
+  ) {
+    return this.agents.notifications(principal, parse(uuid, workspaceId));
+  }
+  @Post("notifications/:id/read")
+  readNotification(@PrincipalId() principal: string, @Param("id") id: string) {
+    return this.agents.readNotification(principal, parse(uuid, id));
+  }
   @Get(":id")
   detail(@PrincipalId() principal: string, @Param("id") id: string) {
     return this.agents.detail(principal, parse(uuid, id));

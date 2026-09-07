@@ -28,6 +28,23 @@ interface Props {
   onSuccess(message: string): void;
   onError(error: unknown): void;
 }
+interface Operations {
+  queued: number;
+  running: number;
+  awaitingApproval: number;
+  succeeded: number;
+  failedLast24Hours: number;
+  staleRunning: number;
+  oldestQueuedSeconds: number | null;
+}
+interface Notification {
+  id: string;
+  jobId: string;
+  kind: string;
+  title: string;
+  read: boolean;
+  createdAt: string;
+}
 
 export function AgentJobsPanel({
   workspaceId,
@@ -42,6 +59,9 @@ export function AgentJobsPanel({
     total: number;
   } | null>(null);
   const [detail, setDetail] = useState<JobDetail | null>(null);
+  const [operations, setOperations] = useState<Operations | null>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const canApprove = workspaceRole === "owner" || workspaceRole === "admin";
   const refresh = useCallback(async () => {
     try {
       const next = await request<{
@@ -50,12 +70,24 @@ export function AgentJobsPanel({
         total: number;
       }>(`/api/ai/agent-jobs?workspaceId=${workspaceId}&page=${page}`);
       setData(next);
+      if (canApprove) {
+        const [metrics, notices] = await Promise.all([
+          request<Operations>(
+            `/api/ai/agent-jobs/operations?workspaceId=${workspaceId}`,
+          ),
+          request<Notification[]>(
+            `/api/ai/agent-jobs/notifications?workspaceId=${workspaceId}`,
+          ),
+        ]);
+        setOperations(metrics);
+        setNotifications(notices);
+      }
       if (detail)
         setDetail(await request<JobDetail>(`/api/ai/agent-jobs/${detail.id}`));
     } catch (error) {
       onError(error);
     }
-  }, [detail?.id, onError, page, workspaceId]);
+  }, [canApprove, detail?.id, onError, page, workspaceId]);
   useEffect(() => {
     setPage(1);
     setDetail(null);
@@ -100,7 +132,16 @@ export function AgentJobsPanel({
     }
   }
   const canWrite = workspaceRole !== "viewer";
-  const canApprove = workspaceRole === "owner" || workspaceRole === "admin";
+  async function markRead(id: string) {
+    try {
+      await mutate(`/api/ai/agent-jobs/notifications/${id}/read`, {});
+      setNotifications((items) =>
+        items.map((item) => (item.id === id ? { ...item, read: true } : item)),
+      );
+    } catch (error) {
+      onError(error);
+    }
+  }
   return (
     <section className="agent-panel">
       <div className="brief-heading">
@@ -120,6 +161,46 @@ export function AgentJobsPanel({
         />
         <button disabled={!canWrite}>Jalankan agent</button>
       </form>
+      {operations && (
+        <div className="agent-metrics">
+          <span>
+            queued <strong>{operations.queued}</strong>
+          </span>
+          <span>
+            running <strong>{operations.running}</strong>
+          </span>
+          <span>
+            approval <strong>{operations.awaitingApproval}</strong>
+          </span>
+          <span>
+            failed 24h <strong>{operations.failedLast24Hours}</strong>
+          </span>
+          <span>
+            stale <strong>{operations.staleRunning}</strong>
+          </span>
+        </div>
+      )}
+      {notifications.length > 0 && canApprove && (
+        <div className="agent-notifications">
+          {notifications.slice(0, 5).map((notice) => (
+            <button
+              type="button"
+              key={notice.id}
+              className={notice.read ? "read" : ""}
+              onClick={() =>
+                notice.read
+                  ? request<JobDetail>(`/api/ai/agent-jobs/${notice.jobId}`)
+                      .then(setDetail)
+                      .catch(onError)
+                  : void markRead(notice.id)
+              }
+            >
+              {notice.title}
+              <small>{notice.kind.replaceAll("_", " ")}</small>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="agent-layout">
         <div className="agent-jobs">
           {data?.items.map((job) => (
