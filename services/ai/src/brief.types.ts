@@ -48,6 +48,10 @@ export interface UsageSummary {
   running: number;
   maxConcurrentRuns: number;
   retentionDays: number;
+  tokensToday: number;
+  dailyTokenLimit: number;
+  costMicrousdToday: number;
+  dailyCostMicrousd: number;
 }
 
 export interface GenerateBriefInput {

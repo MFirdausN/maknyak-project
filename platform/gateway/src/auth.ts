@@ -36,9 +36,11 @@ export class AuthenticationGuard implements CanActivate {
         ? this.developmentPrincipal(request)
         : await this.oidcPrincipal(request);
     const requestId = request.headers["x-request-id"];
+    const traceparent = request.headers.traceparent;
     await this.syncPrincipal(
       principal,
       typeof requestId === "string" ? requestId : "unknown",
+      typeof traceparent === "string" ? traceparent : undefined,
     );
     request.principal = principal;
     return true;
@@ -110,6 +112,7 @@ export class AuthenticationGuard implements CanActivate {
   private async syncPrincipal(
     principal: AuthenticatedPrincipal,
     requestId: string,
+    traceparent?: string,
   ): Promise<void> {
     try {
       const response = await fetch(
@@ -120,6 +123,7 @@ export class AuthenticationGuard implements CanActivate {
             "content-type": "application/json",
             "x-internal-api-key": this.config.INTERNAL_API_KEY,
             "x-request-id": requestId,
+            ...(traceparent ? { traceparent } : {}),
           },
           body: JSON.stringify(principal),
           signal: AbortSignal.timeout(3_000),
@@ -145,6 +149,14 @@ export const CurrentRequestId = createParamDecorator(
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const requestId = request.headers["x-request-id"];
     return typeof requestId === "string" ? requestId : "unknown";
+  },
+);
+
+export const CurrentTraceparent = createParamDecorator(
+  (_data: unknown, context: ExecutionContext): string | undefined => {
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const value = request.headers.traceparent;
+    return typeof value === "string" ? value : undefined;
   },
 );
 

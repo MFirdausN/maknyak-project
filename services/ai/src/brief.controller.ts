@@ -17,7 +17,7 @@ import { z } from "zod";
 import { BriefService } from "./brief.service";
 import type { Brief, BriefPage } from "./brief.types";
 import { DATABASE } from "./database";
-import { PrincipalId } from "./principal";
+import { PrincipalId, TraceId } from "./principal";
 
 const generateSchema = z.object({
   workspaceId: z.string().uuid(),
@@ -104,9 +104,15 @@ export class BriefController {
   @Post("/briefs")
   generate(
     @PrincipalId() principalId: string,
+    @TraceId() traceId: string | undefined,
     @Body() body: unknown,
   ): Promise<Brief> {
-    return this.briefs.generate(principalId, parse(generateSchema, body));
+    return this.briefs.generate(
+      principalId,
+      parse(generateSchema, body),
+      undefined,
+      traceId,
+    );
   }
 
   @Get("/usage")
@@ -133,6 +139,7 @@ export class BriefController {
   @Post("/briefs/stream")
   async stream(
     @PrincipalId() principalId: string,
+    @TraceId() traceId: string | undefined,
     @Body() body: unknown,
     @Res() response: StreamResponse,
   ): Promise<void> {
@@ -143,9 +150,13 @@ export class BriefController {
     response.setHeader("connection", "keep-alive");
     response.flushHeaders();
     try {
-      const brief = await this.briefs.generate(principalId, input, (chunk) => {
-        response.write(`event: token\ndata: ${JSON.stringify(chunk)}\n\n`);
-      });
+      const brief = await this.briefs.generate(
+        principalId,
+        input,
+        (chunk) =>
+          response.write(`event: token\ndata: ${JSON.stringify(chunk)}\n\n`),
+        traceId,
+      );
       response.write(`event: result\ndata: ${JSON.stringify(brief)}\n\n`);
     } catch (error) {
       const message =

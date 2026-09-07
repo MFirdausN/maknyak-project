@@ -13,7 +13,7 @@ oidc_token() {
 }
 request() {
   local token="$1" method="$2" path="$3" body="${4:-}"
-  local args=(--silent --show-error --request "$method" --header "authorization: Bearer ${token}" --header "x-request-id: phase2-brief-test")
+  local args=(--silent --show-error --request "$method" --header "authorization: Bearer ${token}" --header "x-request-id: phase2-brief-test" --header "traceparent: 00-11111111111111111111111111111111-2222222222222222-01")
   [[ -z "$body" ]] || args+=(--header "content-type: application/json" --data "$body")
   curl "${args[@]}" "http://localhost:${gateway_port}/api/v1${path}"
 }
@@ -61,7 +61,29 @@ echo "ok: authenticated workspace feedback is stored"
 
 usage="$(request "$owner_token" GET "/ai/usage?workspaceId=${workspace_id}")"
 [[ "$(json_field runsToday <<<"$usage")" == "1" && "$(json_field dailyRunLimit <<<"$usage")" == "50" ]] || { echo "usage summary failed: ${usage}" >&2; exit 1; }
+[[ "$(json_field tokensToday <<<"$usage")" -gt 0 ]] || { echo "token metering was not recorded: ${usage}" >&2; exit 1; }
 echo "ok: daily usage budget is visible"
+
+memory="$(request "$owner_token" PUT /ai/memories "{\"workspaceId\":\"${workspace_id}\",\"key\":\"language\",\"value\":\"Bahasa Indonesia\"}")"
+[[ "$(json_field key <<<"$memory")" == "language" ]] || { echo "memory was not stored" >&2; exit 1; }
+conversation="$(request "$owner_token" POST /ai/conversations "{\"workspaceId\":\"${workspace_id}\",\"title\":\"Phase 2 memory test\"}")"
+conversation_id="$(json_field id <<<"$conversation")"
+reply="$(request "$owner_token" POST "/ai/conversations/${conversation_id}/messages" '{"content":"Gunakan preferensi bahasa saya"}')"
+[[ "$reply" == *'Bahasa Indonesia'* ]] || { echo "conversation did not use tenant memory: ${reply}" >&2; exit 1; }
+echo "ok: tenant-scoped conversation uses principal memory"
+
+[[ "$(status "$outsider_token" GET "/ai/conversations/${conversation_id}/messages")" == "403" ]] || {
+  echo "unrelated principal accessed tenant conversation" >&2; exit 1;
+}
+echo "ok: conversation and memory remain tenant isolated"
+
+tool_request="$(request "$owner_token" POST /ai/tool-requests "{\"workspaceId\":\"${workspace_id}\",\"conversationId\":\"${conversation_id}\",\"toolName\":\"conversation.stats\",\"arguments\":{}}")"
+tool_id="$(json_field id <<<"$tool_request")"
+[[ "$(status "$owner_token" POST "/ai/tool-requests/${tool_id}/execute")" == "403" ]] || { echo "unapproved tool execution was allowed" >&2; exit 1; }
+request "$owner_token" POST "/ai/tool-requests/${tool_id}/approve" '{}' >/dev/null
+tool_result="$(request "$owner_token" POST "/ai/tool-requests/${tool_id}/execute" '{}')"
+[[ "$tool_result" == *'"messages":2'* ]] || { echo "approved sandbox tool failed: ${tool_result}" >&2; exit 1; }
+echo "ok: allowlisted tool requires approval and executes without shell/network access"
 
 docker compose exec -T postgres psql --quiet -U "${POSTGRES_USER:-maknyak}" -d "${POSTGRES_DB:-maknyak}" \
   --command "INSERT INTO ai.workspace_limits (workspace_id, daily_run_limit) VALUES ('${workspace_id}', 1) ON CONFLICT (workspace_id) DO UPDATE SET daily_run_limit = 1;" >/dev/null
@@ -87,3 +109,7 @@ echo "ok: unrelated principal cannot submit tenant feedback"
 run_count="$(docker compose exec -T postgres psql --tuples-only --no-align -U "${POSTGRES_USER:-maknyak}" -d "${POSTGRES_DB:-maknyak}" --command "SELECT count(*) FROM ai.runs WHERE workspace_id = '${workspace_id}' AND status = 'succeeded' AND latency_ms IS NOT NULL;")"
 [[ "$run_count" == "1" ]] || { echo "AI usage run was not recorded" >&2; exit 1; }
 echo "ok: AI run usage and latency are recorded"
+
+trace_count="$(docker compose exec -T postgres psql --tuples-only --no-align -U "${POSTGRES_USER:-maknyak}" -d "${POSTGRES_DB:-maknyak}" --command "SELECT count(*) FROM ai.runs WHERE workspace_id = '${workspace_id}' AND trace_id = '11111111111111111111111111111111';")"
+[[ "$trace_count" == "1" ]] || { echo "distributed trace context was not persisted" >&2; exit 1; }
+echo "ok: W3C trace context crosses Gateway and AI persistence"

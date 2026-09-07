@@ -14,7 +14,9 @@ test("deterministic provider produces the project brief contract", async () => {
     "test prompt",
     (chunk) => chunks.push(chunk),
   );
-  assert.match(result.summary, /Customer onboarding/);
-  assert.ok(result.acceptanceCriteria.length > 0);
+  assert.match(result.result.summary, /Customer onboarding/);
+  assert.ok(result.result.acceptanceCriteria.length > 0);
+  assert.ok(result.usage.inputTokens > 0);
+  assert.ok(result.usage.outputTokens > 0);
   assert.ok(chunks.length > 1);
 });

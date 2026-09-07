@@ -52,6 +52,8 @@ Keycloak `start-dev`, seeded password grant, dan kredensial di realm import hany
 - Transactional outbox diperkenalkan sebelum event produksi pertama agar perubahan data dan publish event konsisten.
 - Secrets masuk melalui environment/secret manager dan tidak disimpan di Git.
 - Structured logs memuat correlation ID, service, version, principal, serta workspace bila tersedia; tidak memuat token atau PII sensitif.
+- HTTP boundary menghasilkan dan meneruskan W3C `traceparent`. AI menyimpan trace ID pada run, message, dan tool request agar satu pekerjaan dapat ditelusuri lintas BFF, Gateway, dan service.
+- Tool AI tidak mengeksekusi kode arbitrer. Tool harus terdaftar pada allowlist, disimpan sebagai request `pending`, disetujui owner/admin, kemudian dieksekusi dengan query tenant-scoped.
 - Backup PostgreSQL dan MinIO harus disertai restore drill.
 
 ## Evolusi deployment

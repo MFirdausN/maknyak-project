@@ -18,7 +18,12 @@ export interface BriefProvider {
     input: GenerateBriefInput,
     prompt: string,
     onChunk?: (chunk: string) => void,
-  ): Promise<BriefResult>;
+  ): Promise<ProviderResult>;
+}
+
+export interface ProviderResult {
+  result: BriefResult;
+  usage: { inputTokens: number; outputTokens: number; costMicrousd: number };
 }
 
 @Injectable()
@@ -35,7 +40,7 @@ export class DeterministicProvider implements BriefProvider {
     input: GenerateBriefInput,
     _prompt: string,
     onChunk?: (chunk: string) => void,
-  ): Promise<BriefResult> {
+  ): Promise<ProviderResult> {
     const result: BriefResult = {
       summary: `${input.title}: ${input.idea.slice(0, 240)}`,
       targetUsers: ["Tim kecil yang perlu memvalidasi dan menjalankan ide"],
@@ -71,7 +76,16 @@ export class DeterministicProvider implements BriefProvider {
       onChunk?.(encoded.slice(index, index + 48));
       await new Promise((resolve) => setTimeout(resolve, 8));
     }
-    return result;
+    return {
+      result,
+      usage: {
+        inputTokens: estimateTokens(
+          `${input.title}\n${input.idea}\n${_prompt}`,
+        ),
+        outputTokens: estimateTokens(encoded),
+        costMicrousd: 0,
+      },
+    };
   }
 }
 
@@ -82,7 +96,7 @@ class OllamaProvider implements BriefProvider {
     input: GenerateBriefInput,
     prompt: string,
     onChunk?: (chunk: string) => void,
-  ): Promise<BriefResult> {
+  ): Promise<ProviderResult> {
     const response = await fetch(
       `${process.env.OLLAMA_URL ?? "http://ollama:11434"}/api/chat`,
       {
@@ -109,11 +123,26 @@ class OllamaProvider implements BriefProvider {
       );
     const payload = (await response.json()) as {
       message?: { content?: string };
+      prompt_eval_count?: number;
+      eval_count?: number;
     };
     const content = payload.message?.content;
     if (!content)
       throw new ServiceUnavailableException("Ollama returned no content");
     onChunk?.(content);
-    return briefResultSchema.parse(JSON.parse(content));
+    return {
+      result: briefResultSchema.parse(JSON.parse(content)),
+      usage: {
+        inputTokens:
+          payload.prompt_eval_count ??
+          estimateTokens(`${prompt}\n${input.title}\n${input.idea}`),
+        outputTokens: payload.eval_count ?? estimateTokens(content),
+        costMicrousd: 0,
+      },
+    };
   }
+}
+
+export function estimateTokens(value: string): number {
+  return Math.max(1, Math.ceil(value.length / 4));
 }

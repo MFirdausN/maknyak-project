@@ -38,6 +38,9 @@ async function forward(
       "content-type": request.headers.get("content-type") ?? "application/json",
       "x-request-id":
         request.headers.get("x-request-id") ?? crypto.randomUUID(),
+      traceparent:
+        request.headers.get("traceparent") ??
+        `00-${randomHex(16)}-${randomHex(8)}-01`,
     },
     cache: "no-store",
     signal: AbortSignal.timeout(125_000),
@@ -59,3 +62,12 @@ async function forward(
 export const GET = forward;
 export const POST = forward;
 export const PUT = forward;
+export const DELETE = forward;
+
+function randomHex(bytes: number): string {
+  const value = new Uint8Array(bytes);
+  crypto.getRandomValues(value);
+  return Array.from(value, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  );
+}

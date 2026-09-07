@@ -14,6 +14,9 @@ const ProjectBriefPanel = lazy(() =>
     default: module.ProjectBriefPanel,
   })),
 );
+const AiWorkbench = lazy(() =>
+  import("./ai-workbench").then((module) => ({ default: module.AiWorkbench })),
+);
 
 interface Session {
   authenticated: boolean;
@@ -456,6 +459,18 @@ export function WorkspaceConsole() {
                     }
                   >
                     <ProjectBriefPanel
+                      workspaceId={selected.id}
+                      workspaceRole={selected.role}
+                      onSuccess={showSuccess}
+                      onError={showError}
+                    />
+                  </Suspense>
+                  <Suspense
+                    fallback={
+                      <div className="brief-loading">Memuat AI Workbench…</div>
+                    }
+                  >
+                    <AiWorkbench
                       workspaceId={selected.id}
                       workspaceRole={selected.role}
                       onSuccess={showSuccess}

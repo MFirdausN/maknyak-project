@@ -30,6 +30,10 @@ interface UsageSummary {
   running: number;
   maxConcurrentRuns: number;
   retentionDays: number;
+  tokensToday: number;
+  dailyTokenLimit: number;
+  costMicrousdToday: number;
+  dailyCostMicrousd: number;
 }
 
 interface BriefPage {
@@ -198,6 +202,13 @@ export function ProjectBriefPanel({
             {usage.running}/{usage.maxConcurrentRuns} sedang berjalan
           </span>
           <span>Retensi {usage.retentionDays} hari</span>
+          <span>
+            {usage.tokensToday}/{usage.dailyTokenLimit} token
+          </span>
+          <span>
+            US${(usage.costMicrousdToday / 1_000_000).toFixed(4)} / US$
+            {(usage.dailyCostMicrousd / 1_000_000).toFixed(2)}
+          </span>
         </div>
       )}
       <form onSubmit={generate} className="brief-form">

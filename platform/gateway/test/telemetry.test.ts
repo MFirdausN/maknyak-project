@@ -25,8 +25,8 @@ test("request telemetry preserves a safe correlation id without logging headers"
       request,
       {
         statusCode: 401,
-        setHeader: (_name, value) => {
-          responseRequestId = value;
+        setHeader: (name, value) => {
+          if (name === "x-request-id") responseRequestId = value;
         },
         once: (_event, listener) => {
           finish = listener;
@@ -39,6 +39,7 @@ test("request telemetry preserves a safe correlation id without logging headers"
     const log = JSON.parse(output) as Record<string, unknown>;
     assert.equal(responseRequestId, "request-123");
     assert.equal(log.requestId, "request-123");
+    assert.match(String(log.traceId), /^[0-9a-f]{32}$/);
     assert.equal(log.path, "/api/v1/workspaces");
     assert.equal(log.statusCode, 401);
     assert.equal(output.includes("must-not-be-logged"), false);

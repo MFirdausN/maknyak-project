@@ -110,6 +110,10 @@ export class BriefService {
       daily_run_limit: number;
       max_concurrent_runs: number;
       retention_days: number;
+      tokens_today: string;
+      cost_today: string;
+      daily_token_limit: number;
+      daily_cost_microusd: string;
     }>(
       `SELECT
         count(r.id) FILTER (WHERE r.created_at >= date_trunc('day', now()))::text AS runs_today,
@@ -117,10 +121,16 @@ export class BriefService {
         COALESCE(l.daily_run_limit, 50) AS daily_run_limit,
         COALESCE(l.max_concurrent_runs, 2) AS max_concurrent_runs,
         COALESCE(l.retention_days, 90) AS retention_days
+        ,(COALESCE(sum(r.input_tokens + r.output_tokens) FILTER (WHERE r.created_at >= date_trunc('day', now())), 0)
+          + (SELECT COALESCE(sum(input_tokens + output_tokens), 0) FROM ai.messages WHERE workspace_id = $1 AND created_at >= date_trunc('day', now())))::text AS tokens_today
+        ,(COALESCE(sum(r.cost_microusd) FILTER (WHERE r.created_at >= date_trunc('day', now())), 0)
+          + (SELECT COALESCE(sum(cost_microusd), 0) FROM ai.messages WHERE workspace_id = $1 AND created_at >= date_trunc('day', now())))::text AS cost_today
+        ,COALESCE(l.daily_token_limit, 100000) AS daily_token_limit
+        ,COALESCE(l.daily_cost_microusd, 1000000)::text AS daily_cost_microusd
       FROM (SELECT $1::uuid AS workspace_id) w
       LEFT JOIN ai.workspace_limits l USING (workspace_id)
       LEFT JOIN ai.runs r USING (workspace_id)
-      GROUP BY l.daily_run_limit, l.max_concurrent_runs, l.retention_days`,
+      GROUP BY l.daily_run_limit, l.max_concurrent_runs, l.retention_days, l.daily_token_limit, l.daily_cost_microusd`,
       [workspaceId],
     );
     const row = result.rows[0]!;
@@ -130,6 +140,10 @@ export class BriefService {
       running: Number(row.running),
       maxConcurrentRuns: row.max_concurrent_runs,
       retentionDays: row.retention_days,
+      tokensToday: Number(row.tokens_today),
+      dailyTokenLimit: row.daily_token_limit,
+      costMicrousdToday: Number(row.cost_today),
+      dailyCostMicrousd: Number(row.daily_cost_microusd),
     };
   }
 
@@ -170,6 +184,7 @@ export class BriefService {
     principalId: string,
     input: GenerateBriefInput,
     onChunk?: (chunk: string) => void,
+    traceId?: string,
   ): Promise<Brief> {
     await this.authorize(
       principalId,
@@ -195,14 +210,16 @@ export class BriefService {
       model.id,
       prompt.id,
       input.idea.length,
+      traceId,
     );
     const runId = run.id;
     if (!runId) throw new Error("AI run insert returned no row");
     const started = Date.now();
     try {
-      const result = await this.providers
+      const generated = await this.providers
         .provider(model.provider, model.provider_model)
         .generate(input, prompt.template, onChunk);
+      const { result, usage } = generated;
       const evaluation = evaluateBrief(result);
       const created = await this.database.query<BriefRow>(
         `INSERT INTO ai.briefs (workspace_id, principal_id, title, idea, model_id, prompt_id, result, evaluation, expires_at)
@@ -223,12 +240,16 @@ export class BriefService {
       );
       await this.database.query(
         `UPDATE ai.runs SET status = 'succeeded', output_characters = $2, latency_ms = $3,
-          evaluation = $4::jsonb, completed_at = now() WHERE id = $1`,
+          evaluation = $4::jsonb, input_tokens = $5, output_tokens = $6,
+          cost_microusd = $7, completed_at = now() WHERE id = $1`,
         [
           runId,
           JSON.stringify(result).length,
           Date.now() - started,
           JSON.stringify(evaluation),
+          usage.inputTokens,
+          usage.outputTokens,
+          usage.costMicrousd,
         ],
       );
       const row = created.rows[0];
@@ -252,6 +273,7 @@ export class BriefService {
     modelId: string,
     promptId: string,
     inputCharacters: number,
+    traceId?: string,
   ) {
     const client = await this.database.connect();
     try {
@@ -268,16 +290,28 @@ export class BriefService {
         daily_run_limit: number;
         max_concurrent_runs: number;
         retention_days: number;
+        daily_token_limit: number;
+        daily_cost_microusd: string;
       }>(
         `SELECT COALESCE(daily_run_limit, 50) AS daily_run_limit,
           COALESCE(max_concurrent_runs, 2) AS max_concurrent_runs,
-          COALESCE(retention_days, 90) AS retention_days
+          COALESCE(retention_days, 90) AS retention_days,
+          COALESCE(daily_token_limit, 100000) AS daily_token_limit,
+          COALESCE(daily_cost_microusd, 1000000)::text AS daily_cost_microusd
          FROM (SELECT $1::uuid AS workspace_id) w LEFT JOIN ai.workspace_limits USING (workspace_id)`,
         [workspaceId],
       );
-      const usage = await client.query<{ today: string; running: string }>(
+      const usage = await client.query<{
+        today: string;
+        running: string;
+        tokens: string;
+        cost: string;
+      }>(
         `SELECT count(*) FILTER (WHERE created_at >= date_trunc('day', now()))::text AS today,
-          count(*) FILTER (WHERE status = 'running')::text AS running FROM ai.runs WHERE workspace_id = $1`,
+          count(*) FILTER (WHERE status = 'running')::text AS running,
+          COALESCE(sum(input_tokens + output_tokens) FILTER (WHERE created_at >= date_trunc('day', now())), 0)::text AS tokens,
+          COALESCE(sum(cost_microusd) FILTER (WHERE created_at >= date_trunc('day', now())), 0)::text AS cost
+          FROM ai.runs WHERE workspace_id = $1`,
         [workspaceId],
       );
       const limits = limit.rows[0]!;
@@ -285,9 +319,16 @@ export class BriefService {
         throw new HttpException("Daily AI generation limit reached", 429);
       if (Number(usage.rows[0]!.running) >= limits.max_concurrent_runs)
         throw new HttpException("Too many concurrent AI generations", 429);
+      if (
+        Number(usage.rows[0]!.tokens) + Math.ceil(inputCharacters / 4) >=
+        limits.daily_token_limit
+      )
+        throw new HttpException("Daily AI token limit reached", 429);
+      if (Number(usage.rows[0]!.cost) >= Number(limits.daily_cost_microusd))
+        throw new HttpException("Daily AI cost limit reached", 429);
       const inserted = await client.query<{ id: string }>(
-        `INSERT INTO ai.runs (workspace_id, principal_id, model_id, prompt_id, status, input_characters, expires_at)
-         VALUES ($1, $2, $3, $4, 'running', $5, now() + make_interval(days => $6)) RETURNING id`,
+        `INSERT INTO ai.runs (workspace_id, principal_id, model_id, prompt_id, status, input_characters, expires_at, trace_id)
+         VALUES ($1, $2, $3, $4, 'running', $5, now() + make_interval(days => $6), $7) RETURNING id`,
         [
           workspaceId,
           principalId,
@@ -295,6 +336,7 @@ export class BriefService {
           promptId,
           inputCharacters,
           limits.retention_days,
+          traceId ?? null,
         ],
       );
       await client.query("COMMIT");

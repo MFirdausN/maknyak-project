@@ -28,6 +28,17 @@ export const PrincipalId = createParamDecorator(
   },
 );
 
+export const TraceId = createParamDecorator(
+  (_data: unknown, context: ExecutionContext): string | undefined => {
+    const request = context
+      .switchToHttp()
+      .getRequest<{ header(name: string): string | undefined }>();
+    return request
+      .header("traceparent")
+      ?.match(/^00-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$/i)?.[1];
+  },
+);
+
 function safeEqual(left: string, right: string): boolean {
   const a = Buffer.from(left);
   const b = Buffer.from(right);

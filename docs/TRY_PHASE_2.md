@@ -42,6 +42,38 @@ Riwayat memakai pagination server-side 10 data per halaman dan tersinkron saat
 tab kembali aktif maupun setiap 10 detik. Viewer dapat membaca brief tetapi
 minimal role `member` diperlukan untuk membuat brief.
 
+## Conversation, memory, dan safe tools
+
+Di panel **AI Workbench**:
+
+1. Buat conversation, lalu kirim pesan.
+2. Simpan memory dengan key/value. Memory bersifat pribadi bagi principal di
+   dalam workspace dan ikut kedaluwarsa sesuai retention workspace.
+3. Kirim pesan berikutnya untuk memastikan jawaban memakai memory tersebut.
+4. Minta tool `conversation.stats` atau `memory.list`. Request pertama kali
+   berstatus `pending` dan belum dapat dieksekusi.
+5. Owner/admin memilih **Approve**, lalu member dapat memilih **Execute**.
+
+Sandbox hanya mengenal dua tool bawaan tersebut. Tidak ada primitive untuk
+menjalankan shell, membaca filesystem, atau memanggil network. Nama tool juga
+dibatasi oleh validation API dan database constraint. Conversation dipaginasi
+10 item, sedangkan data panel disinkronkan setiap 10 detik.
+
+## Evaluation, metering, dan tracing
+
+Evaluation regression fixtures berada di
+`services/ai/test/evaluation-cases.ts`. Jalankan seluruh kasus dengan:
+
+```bash
+pnpm --filter @maknyak/ai test
+```
+
+Provider mengembalikan `inputTokens`, `outputTokens`, dan `costMicrousd`.
+Provider lokal memiliki biaya nol, tetapi tetap mencatat token. Default budget
+adalah 100.000 token dan US$1 per workspace per hari. HTTP request memakai W3C
+`traceparent`; trace ID yang sama dapat dicari pada structured log dan tabel
+`ai.runs`, `ai.messages`, serta `ai.tool_requests`.
+
 ## Opsional: gunakan Ollama
 
 Ollama dan model tidak dinyalakan pada baseline karena ukurannya besar. Periksa
@@ -78,7 +110,8 @@ dan setiap satu jam.
 ## Status Phase 2
 
 Project Brief adalah baseline pertama, bukan penyelesaian seluruh Phase 2.
-Conversation/memory, evaluation dataset dan regression suite, provider token/cost
-budget, distributed tracing, serta tool sandbox masih menjadi pekerjaan
-berikutnya. Quality scoring, feedback, run budgets, concurrency guard, dan
-retention cleanup sudah tersedia.
+Baseline Phase 2 telah mencakup satu pekerjaan bernilai end-to-end, quality
+scoring, feedback, regression fixtures, conversation/memory, usage budgets,
+trace propagation, dan approval-gated safe tools. Integrasi exporter trace ke
+collector eksternal dan validasi harga provider berbayar tetap pekerjaan
+operasional ketika environment tersebut dipilih.

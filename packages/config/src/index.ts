@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
 const baseSchema = z.object({
   NODE_ENV: z
@@ -112,10 +112,19 @@ export function requestTelemetry(service: string) {
         ? received
         : randomUUID();
     const startedAt = process.hrtime.bigint();
+    const receivedTrace = request.headers?.traceparent;
+    const traceId =
+      typeof receivedTrace === "string" &&
+      /^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$/i.test(receivedTrace)
+        ? receivedTrace.split("-")[1]!
+        : randomBytes(16).toString("hex");
+    const traceparent = `00-${traceId}-${randomBytes(8).toString("hex")}-01`;
 
     request.headers ??= {};
     request.headers["x-request-id"] = requestId;
+    request.headers.traceparent = traceparent;
     response.setHeader("x-request-id", requestId);
+    response.setHeader("traceparent", traceparent);
     response.once("finish", () => {
       const durationMs =
         Number(process.hrtime.bigint() - startedAt) / 1_000_000;
@@ -128,6 +137,7 @@ export function requestTelemetry(service: string) {
           event: "http.request.completed",
           service,
           requestId,
+          traceId,
           method: request.method ?? "UNKNOWN",
           path,
           statusCode: response.statusCode,

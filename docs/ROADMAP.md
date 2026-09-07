@@ -34,10 +34,11 @@ Exit: end-to-end tenant isolation tests lulus dan satu pengguna dapat mengelola 
 - [x] Baseline provider abstraction, model registry, versioned prompt, streaming run, dan usage metering.
 - [x] Tenant-scoped brief history dengan pagination 10 item dan lazy-loaded dashboard UI.
 - [x] Structural quality scoring, user feedback, daily/concurrency budgets, dan data retention cleanup.
-- Conversation/memory dan tool execution sandbox.
-- Evaluation dataset/regression suite, distributed tracing, serta provider token/cost budgets.
+- [x] Tenant-scoped conversation/memory dengan retention dan dashboard workbench.
+- [x] Versioned evaluation fixtures, regression suite, token/cost metering, serta W3C trace propagation.
+- [x] Allowlisted tool sandbox dengan admin approval gate dan persisted execution state.
 
-Exit: pengguna menyelesaikan satu pekerjaan bernilai dengan kualitas terukur.
+Exit: pengguna menyelesaikan satu pekerjaan bernilai dengan kualitas terukur. Baseline Phase 2 terpenuhi; exporter trace dan provider berbayar divalidasi saat environment observability/credential tersedia.
 
 ## Phase 3 — Agents
 

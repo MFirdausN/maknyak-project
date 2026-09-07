@@ -22,17 +22,39 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
 
   async cleanup(): Promise<void> {
     try {
-      const result = await this.database.query(
-        `WITH deleted_briefs AS (DELETE FROM ai.briefs WHERE expires_at <= now() RETURNING 1),
-          deleted_runs AS (DELETE FROM ai.runs WHERE expires_at <= now() RETURNING 1)
-         SELECT (SELECT count(*) FROM deleted_briefs)::int AS briefs,
-                (SELECT count(*) FROM deleted_runs)::int AS runs`,
+      const conversations = await this.database.query(
+        `DELETE FROM ai.conversations WHERE expires_at <= now()`,
       );
-      const row = result.rows[0] as
-        { briefs: number; runs: number } | undefined;
-      if (row && (row.briefs > 0 || row.runs > 0))
+      const results = {
+        conversations: conversations.rowCount ?? 0,
+        briefs:
+          (
+            await this.database.query(
+              `DELETE FROM ai.briefs WHERE expires_at <= now()`,
+            )
+          ).rowCount ?? 0,
+        runs:
+          (
+            await this.database.query(
+              `DELETE FROM ai.runs WHERE expires_at <= now()`,
+            )
+          ).rowCount ?? 0,
+        memories:
+          (
+            await this.database.query(
+              `DELETE FROM ai.memories WHERE expires_at <= now()`,
+            )
+          ).rowCount ?? 0,
+        tools:
+          (
+            await this.database.query(
+              `DELETE FROM ai.tool_requests WHERE expires_at <= now()`,
+            )
+          ).rowCount ?? 0,
+      };
+      if (Object.values(results).some((value) => value > 0))
         this.logger.log(
-          `Removed expired AI records: briefs=${row.briefs} runs=${row.runs}`,
+          `Removed expired AI records: ${JSON.stringify(results)}`,
         );
     } catch (error) {
       this.logger.error(
