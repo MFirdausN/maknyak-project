@@ -18,6 +18,7 @@ import type {
   Project,
   Workspace,
   WorkspaceEntitlement,
+  SubscriptionChangePage,
   WorkspaceRole,
 } from "./workspace.types";
 import type { BillingEvent } from "./billing-webhook";
@@ -258,6 +259,55 @@ export class WorkspaceService {
     } finally {
       client.release();
     }
+  }
+
+  async listSubscriptionChanges(
+    principalId: string,
+    workspaceId: string,
+    page: number,
+  ): Promise<SubscriptionChangePage> {
+    requireRole(await this.role(principalId, workspaceId), "owner");
+    const pageSize = 10;
+    const [changes, count] = await Promise.all([
+      this.database.query<{
+        id: string;
+        requested_plan: "free" | "team";
+        requested_by: string;
+        status: "pending" | "applied" | "cancelled" | "failed";
+        resolved_by_provider: string | null;
+        resolved_by_event_id: string | null;
+        created_at: Date;
+        resolved_at: Date | null;
+      }>(
+        `SELECT id, requested_plan, requested_by, status, resolved_by_provider,
+                resolved_by_event_id, created_at, resolved_at
+         FROM workspace.subscription_changes
+         WHERE workspace_id = $1
+         ORDER BY created_at DESC, id DESC LIMIT $2 OFFSET $3`,
+        [workspaceId, pageSize, (page - 1) * pageSize],
+      ),
+      this.database.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM workspace.subscription_changes WHERE workspace_id = $1`,
+        [workspaceId],
+      ),
+    ]);
+    const total = Number(count.rows[0]?.count ?? 0);
+    return {
+      items: changes.rows.map((row) => ({
+        id: row.id,
+        requestedPlan: row.requested_plan,
+        requestedBy: row.requested_by,
+        status: row.status,
+        provider: row.resolved_by_provider,
+        providerEventId: row.resolved_by_event_id,
+        createdAt: row.created_at.toISOString(),
+        resolvedAt: row.resolved_at?.toISOString() ?? null,
+      })),
+      page,
+      pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
   }
 
   async applyBillingEvent(event: BillingEvent) {

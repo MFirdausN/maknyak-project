@@ -40,3 +40,7 @@ Workspace Team dapat meminta downgrade ke Free. Permintaan ditolak jika jumlah
 anggota masih di atas kapasitas Free. Setelah kapasitas valid, event
 `subscription.cancelled` yang ditandatangani menerapkan downgrade secara
 idempotent; limit Free langsung kembali berlaku tanpa menghapus usage ledger.
+
+Owner dapat melihat billing history di bagian bawah dashboard. Daftar ini
+tenant-scoped, hanya dapat dibaca owner, dimuat secara lazy, tersinkron setiap
+sepuluh detik, dan menggunakan pagination 10 data per halaman.

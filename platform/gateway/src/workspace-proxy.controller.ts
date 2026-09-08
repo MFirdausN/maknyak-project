@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { gatewayConfigSchema } from "@maknyak/config";
@@ -226,6 +227,21 @@ export class WorkspaceProxyController {
       principal.id,
       requestId,
       body,
+    );
+  }
+
+  @Get("/:workspaceId/subscription-changes")
+  subscriptionChanges(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @CurrentRequestId() requestId: string,
+    @Param("workspaceId", new ParseUUIDPipe()) workspaceId: string,
+    @Query("page") page = "1",
+  ): Promise<unknown> {
+    return this.forward(
+      `/${workspaceId}/subscription-changes?page=${encodeURIComponent(page)}`,
+      "GET",
+      principal.id,
+      requestId,
     );
   }
 

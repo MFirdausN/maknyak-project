@@ -4,6 +4,8 @@ compose_port() { docker compose port "$1" "$2" | awk -F: 'END { print $NF }'; }
 json_field() { node -e 'let i="";process.stdin.on("data",c=>i+=c);process.stdin.on("end",()=>{let v=JSON.parse(i);for(const k of process.argv[1].split("."))v=v?.[k];if(v!=null)process.stdout.write(String(v))})' "$1"; }
 gateway_port="$(compose_port gateway 3000)"; keycloak_port="$(compose_port keycloak 8080)"; workspace_port="$(compose_port workspace 3002)"
 token="$(curl --fail --silent --show-error -X POST "http://localhost:${keycloak_port}/realms/maknyak/protocol/openid-connect/token" -H 'content-type: application/x-www-form-urlencoded' --data-urlencode 'client_id=maknyak-cli' --data-urlencode 'username=developer' --data-urlencode 'password=maknyak-dev' --data-urlencode 'grant_type=password' | json_field access_token)"
+collaborator_token="$(curl --fail --silent --show-error -X POST "http://localhost:${keycloak_port}/realms/maknyak/protocol/openid-connect/token" -H 'content-type: application/x-www-form-urlencoded' --data-urlencode 'client_id=maknyak-cli' --data-urlencode 'username=collaborator' --data-urlencode 'password=maknyak-collaborator' --data-urlencode 'grant_type=password' | json_field access_token)"
+collaborator_id="$(node -e 'process.stdout.write(JSON.parse(Buffer.from(process.argv[1].split(".")[1],"base64url")).sub)' "$collaborator_token")"
 call() { local method="$1" path="$2" body="${3:-}"; local args=(--silent --show-error -X "$method" -H "authorization: Bearer ${token}" -H 'content-type: application/json'); [[ -z "$body" ]] || args+=(--data "$body"); curl "${args[@]}" "http://localhost:${gateway_port}/api/v1${path}"; }
 suffix="$(date +%s)-${RANDOM}"; workspace_id="$(call POST /workspaces "{\"slug\":\"entitlement-${suffix}\",\"name\":\"Entitlement Test\"}" | json_field id)"
 entitlement="$(call GET "/workspaces/${workspace_id}/entitlements")"
@@ -36,10 +38,13 @@ active="$(call GET "/workspaces/${workspace_id}/entitlements")"
 post_upgrade_id="$(call POST /ai/agent-jobs "{\"workspaceId\":\"${workspace_id}\",\"goal\":\"This job verifies the upgraded Team usage boundary is active.\"}" | json_field id)"
 usage_summary="$(call GET "/ai/usage?workspaceId=${workspace_id}")"
 [[ "$usage_summary" == *'"agentJobsToday":26'* && "$usage_summary" == *'"dailyAgentJobLimit":500'* && "$usage_summary" == *'"agentJobsRemaining":474'* ]] || { echo "commercial usage summary is incorrect: ${usage_summary}" >&2; exit 1; }
-call POST "/workspaces/${workspace_id}/members" '{"principalId":"00000000-0000-4000-8000-000000000006","role":"member"}' >/dev/null
+sixth_member_status="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST -H "authorization: Bearer ${token}" -H 'content-type: application/json' --data "{\"principalId\":\"${collaborator_id}\",\"role\":\"member\"}" "http://localhost:${gateway_port}/api/v1/workspaces/${workspace_id}/members")"
+[[ "$sixth_member_status" == "204" ]] || { echo "failed to add sixth Team member: ${sixth_member_status}" >&2; exit 1; }
 downgrade_blocked="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST -H "authorization: Bearer ${token}" -H 'content-type: application/json' --data '{"planKey":"free"}' "http://localhost:${gateway_port}/api/v1/workspaces/${workspace_id}/subscription-changes")"
 [[ "$downgrade_blocked" == "409" ]] || { echo "unsafe downgrade was not blocked: ${downgrade_blocked}" >&2; exit 1; }
-call DELETE "/workspaces/${workspace_id}/members/00000000-0000-4000-8000-000000000006" >/dev/null
+member_history_status="$(curl --silent --output /dev/null --write-out '%{http_code}' -H "authorization: Bearer ${collaborator_token}" "http://localhost:${gateway_port}/api/v1/workspaces/${workspace_id}/subscription-changes?page=1")"
+[[ "$member_history_status" == "403" ]] || { echo "non-owner accessed billing history: ${member_history_status}" >&2; exit 1; }
+call DELETE "/workspaces/${workspace_id}/members/${collaborator_id}" >/dev/null
 call POST "/workspaces/${workspace_id}/subscription-changes" '{"planKey":"free"}' >/dev/null
 cancel_event_id="phase4-cancel-${suffix}"; cancel_occurred_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 cancel_body="{\"provider\":\"test-provider\",\"eventId\":\"${cancel_event_id}\",\"type\":\"subscription.cancelled\",\"workspaceId\":\"${workspace_id}\",\"planKey\":\"free\",\"occurredAt\":\"${cancel_occurred_at}\"}"
@@ -48,6 +53,8 @@ cancellation="$(curl --fail-with-body --silent --show-error -X POST -H 'content-
 [[ "$cancellation" == *'"status":"applied"'* ]] || { echo "billing cancellation failed: ${cancellation}" >&2; exit 1; }
 downgraded="$(call GET "/workspaces/${workspace_id}/entitlements")"
 [[ "$downgraded" == *'"planKey":"free"'* && "$downgraded" == *'"dailyAgentJobLimit":25'* && "$downgraded" == *'"pendingPlanKey":null'* ]] || { echo "Free entitlement was not restored: ${downgraded}" >&2; exit 1; }
+history="$(call GET "/workspaces/${workspace_id}/subscription-changes?page=1")"
+[[ "$history" == *'"total":2'* && "$history" == *'"pageSize":10'* && "$history" == *'"provider":"test-provider"'* ]] || { echo "billing history is incomplete: ${history}" >&2; exit 1; }
 blocked_again="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST -H "authorization: Bearer ${token}" -H 'content-type: application/json' --data "{\"workspaceId\":\"${workspace_id}\",\"goal\":\"The restored Free plan must reject this job above its daily limit.\"}" "http://localhost:${gateway_port}/api/v1/ai/agent-jobs")"
 [[ "$blocked_again" == "429" ]] || { echo "restored Free limit was not enforced: ${blocked_again}" >&2; exit 1; }
 for id in "${ids[@]}"; do call POST "/ai/agent-jobs/${id}/cancel" '{}' >/dev/null || true; done

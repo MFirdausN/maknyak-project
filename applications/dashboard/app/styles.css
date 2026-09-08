@@ -362,6 +362,38 @@ button.danger {
   border-top: 1px solid var(--line);
   padding-top: 24px;
 }
+.billing-history {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 24px;
+}
+.billing-list {
+  margin: 16px 0;
+}
+.billing-list > div {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 90px 80px 1fr minmax(130px, auto);
+  padding: 12px 0;
+}
+.billing-list code,
+.billing-list small {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.billing-status {
+  font: 10px monospace;
+  text-transform: uppercase;
+}
+.billing-status.applied {
+  color: var(--accent);
+}
+.billing-status.pending {
+  color: #d8b45f;
+}
 .agent-goal {
   display: grid;
   grid-template-columns: minmax(150px, 0.3fr) 1fr auto;

@@ -58,3 +58,22 @@ export interface WorkspaceEntitlement {
   readonly updatedAt: string;
   readonly pendingPlanKey: "free" | "team" | null;
 }
+
+export interface SubscriptionChange {
+  readonly id: string;
+  readonly requestedPlan: "free" | "team";
+  readonly status: "pending" | "applied" | "cancelled" | "failed";
+  readonly requestedBy: string;
+  readonly provider: string | null;
+  readonly providerEventId: string | null;
+  readonly createdAt: string;
+  readonly resolvedAt: string | null;
+}
+
+export interface SubscriptionChangePage {
+  readonly items: SubscriptionChange[];
+  readonly page: number;
+  readonly pageSize: 10;
+  readonly total: number;
+  readonly totalPages: number;
+}

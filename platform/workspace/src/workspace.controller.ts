@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import type { HealthResponse, ServiceInfo } from "@maknyak/contracts";
@@ -26,6 +27,7 @@ import type {
   Project,
   Workspace,
   WorkspaceEntitlement,
+  SubscriptionChangePage,
 } from "./workspace.types";
 import { DATABASE } from "./database";
 import { billingEventSchema, verifyBillingEvent } from "./billing-webhook";
@@ -60,6 +62,7 @@ const authorizeSchema = z.object({
   projectId: z.string().uuid().optional(),
 });
 const planChangeSchema = z.object({ planKey: z.enum(["free", "team"]) });
+const pageSchema = z.coerce.number().int().min(1).max(10_000).default(1);
 
 export const workspaceInfo: ServiceInfo = {
   name: "workspace",
@@ -183,6 +186,19 @@ export class WorkspaceController {
       principalId,
       workspaceId,
       parse(planChangeSchema, body).planKey,
+    );
+  }
+
+  @Get("/workspaces/:workspaceId/subscription-changes")
+  subscriptionChanges(
+    @PrincipalId() principalId: string,
+    @Param("workspaceId", new ParseUUIDPipe()) workspaceId: string,
+    @Query("page") page: unknown,
+  ): Promise<SubscriptionChangePage> {
+    return this.workspaces.listSubscriptionChanges(
+      principalId,
+      workspaceId,
+      parse(pageSchema, page),
     );
   }
 

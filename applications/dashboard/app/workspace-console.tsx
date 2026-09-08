@@ -22,6 +22,11 @@ const AgentJobsPanel = lazy(() =>
     default: module.AgentJobsPanel,
   })),
 );
+const BillingHistoryPanel = lazy(() =>
+  import("./billing-history-panel").then((module) => ({
+    default: module.BillingHistoryPanel,
+  })),
+);
 
 interface Session {
   authenticated: boolean;
@@ -559,6 +564,20 @@ export function WorkspaceConsole() {
                       onError={showError}
                     />
                   </Suspense>
+                  {selected.role === "owner" && (
+                    <Suspense
+                      fallback={
+                        <div className="brief-loading">
+                          Memuat billing history…
+                        </div>
+                      }
+                    >
+                      <BillingHistoryPanel
+                        workspaceId={selected.id}
+                        onError={showError}
+                      />
+                    </Suspense>
+                  )}
                 </>
               ) : (
                 <div className="empty">
