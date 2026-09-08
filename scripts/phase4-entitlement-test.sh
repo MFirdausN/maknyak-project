@@ -36,6 +36,20 @@ active="$(call GET "/workspaces/${workspace_id}/entitlements")"
 post_upgrade_id="$(call POST /ai/agent-jobs "{\"workspaceId\":\"${workspace_id}\",\"goal\":\"This job verifies the upgraded Team usage boundary is active.\"}" | json_field id)"
 usage_summary="$(call GET "/ai/usage?workspaceId=${workspace_id}")"
 [[ "$usage_summary" == *'"agentJobsToday":26'* && "$usage_summary" == *'"dailyAgentJobLimit":500'* && "$usage_summary" == *'"agentJobsRemaining":474'* ]] || { echo "commercial usage summary is incorrect: ${usage_summary}" >&2; exit 1; }
+call POST "/workspaces/${workspace_id}/members" '{"principalId":"00000000-0000-4000-8000-000000000006","role":"member"}' >/dev/null
+downgrade_blocked="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST -H "authorization: Bearer ${token}" -H 'content-type: application/json' --data '{"planKey":"free"}' "http://localhost:${gateway_port}/api/v1/workspaces/${workspace_id}/subscription-changes")"
+[[ "$downgrade_blocked" == "409" ]] || { echo "unsafe downgrade was not blocked: ${downgrade_blocked}" >&2; exit 1; }
+call DELETE "/workspaces/${workspace_id}/members/00000000-0000-4000-8000-000000000006" >/dev/null
+call POST "/workspaces/${workspace_id}/subscription-changes" '{"planKey":"free"}' >/dev/null
+cancel_event_id="phase4-cancel-${suffix}"; cancel_occurred_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+cancel_body="{\"provider\":\"test-provider\",\"eventId\":\"${cancel_event_id}\",\"type\":\"subscription.cancelled\",\"workspaceId\":\"${workspace_id}\",\"planKey\":\"free\",\"occurredAt\":\"${cancel_occurred_at}\"}"
+cancel_signature="$(node -e 'const {createHmac}=require("node:crypto");process.stdout.write(createHmac("sha256",process.argv[1]).update(process.argv.slice(2).join("\n")).digest("hex"))' "$billing_secret" test-provider "$cancel_event_id" subscription.cancelled "$workspace_id" free "$cancel_occurred_at")"
+cancellation="$(curl --fail-with-body --silent --show-error -X POST -H 'content-type: application/json' -H "x-billing-signature: sha256=${cancel_signature}" --data "$cancel_body" "http://localhost:${workspace_port}/api/v1/internal/billing/events")"
+[[ "$cancellation" == *'"status":"applied"'* ]] || { echo "billing cancellation failed: ${cancellation}" >&2; exit 1; }
+downgraded="$(call GET "/workspaces/${workspace_id}/entitlements")"
+[[ "$downgraded" == *'"planKey":"free"'* && "$downgraded" == *'"dailyAgentJobLimit":25'* && "$downgraded" == *'"pendingPlanKey":null'* ]] || { echo "Free entitlement was not restored: ${downgraded}" >&2; exit 1; }
+blocked_again="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST -H "authorization: Bearer ${token}" -H 'content-type: application/json' --data "{\"workspaceId\":\"${workspace_id}\",\"goal\":\"The restored Free plan must reject this job above its daily limit.\"}" "http://localhost:${gateway_port}/api/v1/ai/agent-jobs")"
+[[ "$blocked_again" == "429" ]] || { echo "restored Free limit was not enforced: ${blocked_again}" >&2; exit 1; }
 for id in "${ids[@]}"; do call POST "/ai/agent-jobs/${id}/cancel" '{}' >/dev/null || true; done
 call POST "/ai/agent-jobs/${post_upgrade_id}/cancel" '{}' >/dev/null || true
-echo "ok: signed idempotent billing activation upgrades enforced usage/member entitlements"
+echo "ok: signed activation/cancellation safely transitions enforced commercial entitlements"

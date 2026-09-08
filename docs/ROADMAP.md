@@ -58,7 +58,8 @@ Exit: agent menghemat waktu pengguna secara konsisten tanpa melanggar safety bou
 - [x] Pending subscription change, transactional agent usage ledger, dan concurrent-safe member enforcement.
 - [x] Signed provider-neutral billing event, idempotent activation lifecycle, audit, dan outbox.
 - [x] Tenant-scoped commercial usage summary dengan limit, remaining quota, dan dashboard auto-sync.
-- Cancellation/downgrade lifecycle, checkout adapter nyata, dan support/admin tooling.
+- [x] Concurrent-safe downgrade request, member-capacity guard, dan signed cancellation event.
+- Checkout adapter nyata dan support/admin tooling.
 - Produk SaaS pertama, onboarding, analytics, dan feedback loop.
 - SLO, backup/restore drill, incident response, dan cost controls.
 

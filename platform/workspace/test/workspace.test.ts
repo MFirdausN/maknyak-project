@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { requireRole } from "../src/policy";
 import {
+  billingEventSchema,
   signBillingEvent,
   verifyBillingEvent,
   type BillingEvent,
@@ -12,6 +13,31 @@ test("workspace role hierarchy enforces minimum access", () => {
   assert.doesNotThrow(() => requireRole("member", "member"));
   assert.throws(() => requireRole("viewer", "member"));
   assert.throws(() => requireRole(undefined, "viewer"));
+});
+
+test("billing event semantics bind activation to Team and cancellation to Free", () => {
+  const common = {
+    provider: "test-provider",
+    eventId: "event-12345678",
+    workspaceId: "11111111-1111-4111-8111-111111111111",
+    occurredAt: new Date().toISOString(),
+  };
+  assert.equal(
+    billingEventSchema.safeParse({
+      ...common,
+      type: "subscription.cancelled",
+      planKey: "free",
+    }).success,
+    true,
+  );
+  assert.equal(
+    billingEventSchema.safeParse({
+      ...common,
+      type: "subscription.cancelled",
+      planKey: "team",
+    }).success,
+    false,
+  );
 });
 
 test("billing events require a valid signature and recent timestamp", () => {

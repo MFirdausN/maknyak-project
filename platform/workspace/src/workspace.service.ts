@@ -209,27 +209,54 @@ export class WorkspaceService {
     const current = await this.entitlementRow(workspaceId);
     if (current.planKey === planKey)
       throw new ConflictException("Workspace already uses this plan");
+    const client = await this.database.connect();
     try {
-      const result = await this.database.query<{
+      await client.query("BEGIN");
+      await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+        `members:${workspaceId}`,
+      ]);
+      const capacity = await client.query<{
+        members: string;
+        member_limit: number;
+      }>(
+        `SELECT count(m.*)::text AS members, p.member_limit
+         FROM workspace.plan_catalog p
+         LEFT JOIN workspace.memberships m ON m.workspace_id = $1
+         WHERE p.plan_key = $2 AND p.active
+         GROUP BY p.member_limit`,
+        [workspaceId, planKey],
+      );
+      const target = capacity.rows[0];
+      if (!target) throw new NotFoundException("Plan not found");
+      if (Number(target.members) > target.member_limit)
+        throw new ConflictException(
+          `Workspace must have at most ${target.member_limit} members before downgrade`,
+        );
+      const result = await client.query<{
         id: string;
         created_at: Date;
       }>(
         `INSERT INTO workspace.subscription_changes (workspace_id, requested_plan, requested_by)
-         SELECT $1, plan_key, $3 FROM workspace.plan_catalog WHERE plan_key = $2 AND active RETURNING id, created_at`,
+         VALUES ($1, $2, $3) RETURNING id, created_at`,
         [workspaceId, planKey, principalId],
       );
-      if (!result.rows[0]) throw new NotFoundException("Plan not found");
+      const row = result.rows[0];
+      if (!row) throw new Error("Subscription change insert returned no row");
+      await client.query("COMMIT");
       return {
-        id: result.rows[0].id,
+        id: row.id,
         workspaceId,
         requestedPlan: planKey,
         status: "pending",
-        createdAt: result.rows[0].created_at.toISOString(),
+        createdAt: row.created_at.toISOString(),
       };
     } catch (error) {
+      await client.query("ROLLBACK");
       if (isUniqueViolation(error))
         throw new ConflictException("A subscription change is already pending");
       throw error;
+    } finally {
+      client.release();
     }
   }
 
@@ -279,6 +306,27 @@ export class WorkspaceService {
       if (!change)
         throw new ConflictException("No matching pending subscription change");
 
+      if (event.type === "subscription.cancelled") {
+        await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+          `members:${event.workspaceId}`,
+        ]);
+        const capacity = await client.query<{
+          members: string;
+          member_limit: number;
+        }>(
+          `SELECT count(m.*)::text AS members, p.member_limit
+           FROM workspace.plan_catalog p
+           LEFT JOIN workspace.memberships m ON m.workspace_id = $1
+           WHERE p.plan_key = $2 GROUP BY p.member_limit`,
+          [event.workspaceId, event.planKey],
+        );
+        const target = capacity.rows[0];
+        if (!target || Number(target.members) > target.member_limit)
+          throw new ConflictException(
+            "Workspace exceeds the target plan member capacity",
+          );
+      }
+
       await client.query(
         `UPDATE workspace.entitlements
          SET plan_key = $2, status = 'active', updated_at = now()
@@ -291,11 +339,15 @@ export class WorkspaceService {
          WHERE id = $1`,
         [change.id, event.provider, event.eventId],
       );
+      const action =
+        event.type === "subscription.cancelled"
+          ? "subscription.cancelled"
+          : "subscription.activated";
       await this.audit(
         client,
         event.workspaceId,
         change.requested_by,
-        "subscription.activated",
+        action,
         "subscription_change",
         change.id,
         {
@@ -304,17 +356,12 @@ export class WorkspaceService {
           eventId: event.eventId,
         },
       );
-      await this.outbox(
-        client,
-        "workspace.subscription.activated.v1",
-        event.workspaceId,
-        {
-          workspaceId: event.workspaceId,
-          planKey: event.planKey,
-          provider: event.provider,
-          eventId: event.eventId,
-        },
-      );
+      await this.outbox(client, `workspace.${action}.v1`, event.workspaceId, {
+        workspaceId: event.workspaceId,
+        planKey: event.planKey,
+        provider: event.provider,
+        eventId: event.eventId,
+      });
       await client.query("COMMIT");
       return { eventId: event.eventId, status: "applied" as const };
     } catch (error) {

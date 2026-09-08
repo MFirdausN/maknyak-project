@@ -287,17 +287,19 @@ export function WorkspaceConsole() {
     }
   }
 
-  async function requestTeamPlan() {
+  async function requestPlan(planKey: "free" | "team") {
     if (!selected) return;
     try {
       await api(`/api/workspaces/${selected.id}/subscription-changes`, {
         method: "POST",
-        body: JSON.stringify({ planKey: "team" }),
+        body: JSON.stringify({ planKey }),
       });
       setEntitlement(
         await api<Entitlement>(`/api/workspaces/${selected.id}/entitlements`),
       );
-      showSuccess("Permintaan plan Team dibuat dan menunggu payment adapter.");
+      showSuccess(
+        `Permintaan plan ${planKey === "team" ? "Team" : "Free"} dibuat dan menunggu payment adapter.`,
+      );
     } catch (error) {
       showError(error);
     }
@@ -420,18 +422,25 @@ export function WorkspaceConsole() {
                           {entitlement.dailyAgentJobLimit} agent job/hari ·
                           retensi {entitlement.retentionDays} hari
                         </span>
-                        {selected.role === "owner" &&
-                          entitlement.planKey === "free" && (
-                            <button
-                              type="button"
-                              disabled={Boolean(entitlement.pendingPlanKey)}
-                              onClick={() => void requestTeamPlan()}
-                            >
-                              {entitlement.pendingPlanKey
-                                ? "Upgrade Team pending"
-                                : "Request plan Team"}
-                            </button>
-                          )}
+                        {selected.role === "owner" && (
+                          <button
+                            type="button"
+                            disabled={Boolean(entitlement.pendingPlanKey)}
+                            onClick={() =>
+                              void requestPlan(
+                                entitlement.planKey === "free"
+                                  ? "team"
+                                  : "free",
+                              )
+                            }
+                          >
+                            {entitlement.pendingPlanKey
+                              ? `Perubahan ke ${entitlement.pendingPlanKey} pending`
+                              : entitlement.planKey === "free"
+                                ? "Request plan Team"
+                                : "Downgrade ke Free"}
+                          </button>
+                        )}
                       </div>
                     )}
                     <form onSubmit={createProject}>

@@ -35,3 +35,8 @@ Ringkasan penggunaan pada dashboard tersinkron otomatis setiap sepuluh detik.
 Kartu usage menampilkan job agent hari ini, limit plan aktif, sisa kuota, token,
 biaya provider, dan aktivitas generasi brief. Semua nilai dihitung server-side
 setelah tenant authorization.
+
+Workspace Team dapat meminta downgrade ke Free. Permintaan ditolak jika jumlah
+anggota masih di atas kapasitas Free. Setelah kapasitas valid, event
+`subscription.cancelled` yang ditandatangani menerapkan downgrade secara
+idempotent; limit Free langsung kembali berlaku tanpa menghapus usage ledger.
