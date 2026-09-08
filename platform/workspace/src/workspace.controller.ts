@@ -56,6 +56,7 @@ const authorizeSchema = z.object({
   minimumRole: z.enum(["owner", "admin", "member", "viewer"]),
   projectId: z.string().uuid().optional(),
 });
+const planChangeSchema = z.object({ planKey: z.enum(["free", "team"]) });
 
 export const workspaceInfo: ServiceInfo = {
   name: "workspace",
@@ -153,6 +154,19 @@ export class WorkspaceController {
     @Param("workspaceId", new ParseUUIDPipe()) workspaceId: string,
   ): Promise<WorkspaceEntitlement> {
     return this.workspaces.entitlement(principalId, workspaceId);
+  }
+
+  @Post("/workspaces/:workspaceId/subscription-changes")
+  requestPlanChange(
+    @PrincipalId() principalId: string,
+    @Param("workspaceId", new ParseUUIDPipe()) workspaceId: string,
+    @Body() body: unknown,
+  ) {
+    return this.workspaces.requestPlanChange(
+      principalId,
+      workspaceId,
+      parse(planChangeSchema, body).planKey,
+    );
   }
 
   @Post("/workspaces/:workspaceId/members")

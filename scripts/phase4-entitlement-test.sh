@@ -11,5 +11,13 @@ entitlement="$(call GET "/workspaces/${workspace_id}/entitlements")"
 ids=(); for index in {1..25}; do ids+=("$(call POST /ai/agent-jobs "{\"workspaceId\":\"${workspace_id}\",\"goal\":\"Entitlement boundary validation job number ${index} with sufficient detail.\"}" | json_field id)"); done
 status="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST -H "authorization: Bearer ${token}" -H 'content-type: application/json' --data "{\"workspaceId\":\"${workspace_id}\",\"goal\":\"This twenty sixth job must be rejected by server-side entitlement enforcement.\"}" "http://localhost:${gateway_port}/api/v1/ai/agent-jobs")"
 [[ "$status" == "429" ]] || { echo "expected 429 at entitlement boundary, got ${status}" >&2; exit 1; }
+usage="$(docker compose exec -T postgres psql --tuples-only --no-align -U "${POSTGRES_USER:-maknyak}" -d "${POSTGRES_DB:-maknyak}" -c "SELECT count(*) FROM agent.usage_events WHERE workspace_id = '${workspace_id}';")"
+[[ "$usage" == "25" ]] || { echo "expected 25 transactional usage events, got ${usage}" >&2; exit 1; }
+for suffix_id in 2 3 4 5; do call POST "/workspaces/${workspace_id}/members" "{\"principalId\":\"00000000-0000-4000-8000-00000000000${suffix_id}\",\"role\":\"member\"}" >/dev/null; done
+member_status="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST -H "authorization: Bearer ${token}" -H 'content-type: application/json' --data '{"principalId":"00000000-0000-4000-8000-000000000006","role":"member"}' "http://localhost:${gateway_port}/api/v1/workspaces/${workspace_id}/members")"
+[[ "$member_status" == "409" ]] || { echo "expected member limit conflict, got ${member_status}" >&2; exit 1; }
+call POST "/workspaces/${workspace_id}/subscription-changes" '{"planKey":"team"}' >/dev/null
+pending="$(call GET "/workspaces/${workspace_id}/entitlements")"
+[[ "$pending" == *'"planKey":"free"'* && "$pending" == *'"pendingPlanKey":"team"'* ]] || { echo "subscription request changed entitlement prematurely: ${pending}" >&2; exit 1; }
 for id in "${ids[@]}"; do call POST "/ai/agent-jobs/${id}/cancel" '{}' >/dev/null || true; done
-echo "ok: free entitlement is visible and daily agent limit is enforced at 25 jobs"
+echo "ok: usage/member limits are enforced and Team upgrade remains pending activation"

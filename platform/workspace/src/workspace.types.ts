@@ -56,4 +56,5 @@ export interface WorkspaceEntitlement {
   readonly dailyAgentJobLimit: number;
   readonly retentionDays: number;
   readonly updatedAt: string;
+  readonly pendingPlanKey: "free" | "team" | null;
 }

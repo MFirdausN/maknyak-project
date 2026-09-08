@@ -53,6 +53,7 @@ interface Entitlement {
   memberLimit: number;
   dailyAgentJobLimit: number;
   retentionDays: number;
+  pendingPlanKey: string | null;
 }
 
 interface Toast {
@@ -286,6 +287,22 @@ export function WorkspaceConsole() {
     }
   }
 
+  async function requestTeamPlan() {
+    if (!selected) return;
+    try {
+      await api(`/api/workspaces/${selected.id}/subscription-changes`, {
+        method: "POST",
+        body: JSON.stringify({ planKey: "team" }),
+      });
+      setEntitlement(
+        await api<Entitlement>(`/api/workspaces/${selected.id}/entitlements`),
+      );
+      showSuccess("Permintaan plan Team dibuat dan menunggu payment adapter.");
+    } catch (error) {
+      showError(error);
+    }
+  }
+
   return (
     <main>
       <nav>
@@ -403,6 +420,18 @@ export function WorkspaceConsole() {
                           {entitlement.dailyAgentJobLimit} agent job/hari ·
                           retensi {entitlement.retentionDays} hari
                         </span>
+                        {selected.role === "owner" &&
+                          entitlement.planKey === "free" && (
+                            <button
+                              type="button"
+                              disabled={Boolean(entitlement.pendingPlanKey)}
+                              onClick={() => void requestTeamPlan()}
+                            >
+                              {entitlement.pendingPlanKey
+                                ? "Upgrade Team pending"
+                                : "Request plan Team"}
+                            </button>
+                          )}
                       </div>
                     )}
                     <form onSubmit={createProject}>

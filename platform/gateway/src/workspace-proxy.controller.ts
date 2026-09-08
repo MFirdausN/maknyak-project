@@ -213,6 +213,22 @@ export class WorkspaceProxyController {
     );
   }
 
+  @Post("/:workspaceId/subscription-changes")
+  requestPlanChange(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @CurrentRequestId() requestId: string,
+    @Param("workspaceId", new ParseUUIDPipe()) workspaceId: string,
+    @Body() body: unknown,
+  ): Promise<unknown> {
+    return this.forward(
+      `/${workspaceId}/subscription-changes`,
+      "POST",
+      principal.id,
+      requestId,
+      body,
+    );
+  }
+
   @Get("/:workspaceId/audit")
   audit(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,

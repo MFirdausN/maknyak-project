@@ -15,6 +15,12 @@ Dashboard menampilkan plan dan limit pada workspace terpilih. Limit agent
 ditegakkan oleh service AI berdasarkan authorization context dari Workspace;
 request ke-26 pada hari yang sama mendapat HTTP `429`.
 
-Belum ada checkout atau perubahan plan manual. Payment provider nantinya hanya
+Belum ada checkout atau aktivasi plan manual. Payment provider nantinya hanya
 mengubah status subscription; service produk tetap membaca entitlement yang
 sama sehingga aturan bisnis tidak bergantung langsung pada vendor pembayaran.
+
+Owner dapat membuat permintaan upgrade Team dari dashboard. Statusnya tetap
+`pending`; plan dan limit tidak berubah sebelum adapter pembayaran yang tepercaya
+mengirim event aktivasi. Setiap agent job juga menulis usage event idempotent
+dalam transaksi yang sama dengan job sehingga limit aman terhadap request
+konkuren.

@@ -74,22 +74,40 @@ export class AgentService {
       workspaceId,
       "member",
     );
-    const used = await this.database.query<{ count: string }>(
-      `SELECT count(*)::text AS count FROM agent.jobs WHERE workspace_id = $1 AND created_at >= date_trunc('day', now())`,
-      [workspaceId],
-    );
-    if (
-      Number(used.rows[0]?.count ?? 0) >=
-      authorization.entitlements.dailyAgentJobLimit
-    )
-      throw new HttpException("Daily agent job entitlement reached", 429);
     const retention = authorization.entitlements.retentionDays;
-    const result = await this.database.query<JobRow>(
-      `INSERT INTO agent.jobs (workspace_id, requested_by, agent_key, goal, trace_id, expires_at)
-       VALUES ($1, $2, $3, $4, $5, now() + make_interval(days => $6)) RETURNING *`,
-      [workspaceId, principalId, agentKey, goal, traceId ?? null, retention],
-    );
-    return job(result.rows[0]!);
+    const client = await this.database.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+        `agent-usage:${workspaceId}`,
+      ]);
+      const used = await client.query<{ quantity: string }>(
+        `SELECT COALESCE(sum(quantity), 0)::text AS quantity FROM agent.usage_events
+         WHERE workspace_id = $1 AND metric = 'agent.job.created' AND occurred_at >= date_trunc('day', now())`,
+        [workspaceId],
+      );
+      if (
+        Number(used.rows[0]?.quantity ?? 0) >=
+        authorization.entitlements.dailyAgentJobLimit
+      )
+        throw new HttpException("Daily agent job entitlement reached", 429);
+      const result = await client.query<JobRow>(
+        `INSERT INTO agent.jobs (workspace_id, requested_by, agent_key, goal, trace_id, expires_at)
+         VALUES ($1, $2, $3, $4, $5, now() + make_interval(days => $6)) RETURNING *`,
+        [workspaceId, principalId, agentKey, goal, traceId ?? null, retention],
+      );
+      await client.query(
+        `INSERT INTO agent.usage_events (workspace_id, principal_id, job_id, metric) VALUES ($1, $2, $3, 'agent.job.created')`,
+        [workspaceId, principalId, result.rows[0]!.id],
+      );
+      await client.query("COMMIT");
+      return job(result.rows[0]!);
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async list(principalId: string, workspaceId: string, page: number) {

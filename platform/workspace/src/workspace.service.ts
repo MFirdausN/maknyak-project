@@ -68,6 +68,7 @@ interface EntitlementRow {
   daily_agent_job_limit: number;
   retention_days: number;
   updated_at: Date;
+  pending_plan_key: "free" | "team" | null;
 }
 
 @Injectable()
@@ -178,7 +179,8 @@ export class WorkspaceService {
     workspaceId: string,
   ): Promise<WorkspaceEntitlement> {
     const result = await this.database.query<EntitlementRow>(
-      `SELECT e.workspace_id, e.plan_key, p.display_name, e.status, p.member_limit, p.daily_agent_job_limit, p.retention_days, e.updated_at
+      `SELECT e.workspace_id, e.plan_key, p.display_name, e.status, p.member_limit, p.daily_agent_job_limit, p.retention_days, e.updated_at,
+        (SELECT requested_plan FROM workspace.subscription_changes WHERE workspace_id = e.workspace_id AND status = 'pending') AS pending_plan_key
        FROM workspace.entitlements e JOIN workspace.plan_catalog p USING (plan_key) WHERE e.workspace_id = $1`,
       [workspaceId],
     );
@@ -193,7 +195,41 @@ export class WorkspaceService {
       dailyAgentJobLimit: row.daily_agent_job_limit,
       retentionDays: row.retention_days,
       updatedAt: row.updated_at.toISOString(),
+      pendingPlanKey: row.pending_plan_key,
     };
+  }
+
+  async requestPlanChange(
+    principalId: string,
+    workspaceId: string,
+    planKey: "free" | "team",
+  ) {
+    requireRole(await this.role(principalId, workspaceId), "owner");
+    const current = await this.entitlementRow(workspaceId);
+    if (current.planKey === planKey)
+      throw new ConflictException("Workspace already uses this plan");
+    try {
+      const result = await this.database.query<{
+        id: string;
+        created_at: Date;
+      }>(
+        `INSERT INTO workspace.subscription_changes (workspace_id, requested_plan, requested_by)
+         SELECT $1, plan_key, $3 FROM workspace.plan_catalog WHERE plan_key = $2 AND active RETURNING id, created_at`,
+        [workspaceId, planKey, principalId],
+      );
+      if (!result.rows[0]) throw new NotFoundException("Plan not found");
+      return {
+        id: result.rows[0].id,
+        workspaceId,
+        requestedPlan: planKey,
+        status: "pending",
+        createdAt: result.rows[0].created_at.toISOString(),
+      };
+    } catch (error) {
+      if (isUniqueViolation(error))
+        throw new ConflictException("A subscription change is already pending");
+      throw error;
+    }
   }
 
   async addMember(
@@ -206,6 +242,7 @@ export class WorkspaceService {
     const client = await this.database.connect();
     try {
       await client.query("BEGIN");
+      await this.enforceMemberLimit(client, workspaceId, memberId);
       await client.query(
         `INSERT INTO workspace.memberships (workspace_id, principal_id, role)
          VALUES ($1, $2, $3)`,
@@ -504,6 +541,11 @@ export class WorkspaceService {
         throw new BadRequestException(
           "Invitation belongs to another email address",
         );
+      await this.enforceMemberLimit(
+        client,
+        invitation.workspace_id,
+        principalId,
+      );
       const membership = await client.query<MembershipRow>(
         `INSERT INTO workspace.memberships (workspace_id, principal_id, role)
          VALUES ($1, $2, $3)
@@ -550,6 +592,36 @@ export class WorkspaceService {
     } finally {
       client.release();
     }
+  }
+
+  private async enforceMemberLimit(
+    client: PoolClient,
+    workspaceId: string,
+    newPrincipalId: string,
+  ) {
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+      `members:${workspaceId}`,
+    ]);
+    const existing = await client.query(
+      `SELECT 1 FROM workspace.memberships WHERE workspace_id = $1 AND principal_id = $2`,
+      [workspaceId, newPrincipalId],
+    );
+    if (existing.rowCount)
+      throw new ConflictException("Principal is already a workspace member");
+    const capacity = await client.query<{
+      members: string;
+      member_limit: number;
+    }>(
+      `SELECT count(m.*)::text AS members, p.member_limit FROM workspace.entitlements e
+       JOIN workspace.plan_catalog p USING (plan_key) LEFT JOIN workspace.memberships m ON m.workspace_id = e.workspace_id
+       WHERE e.workspace_id = $1 GROUP BY p.member_limit`,
+      [workspaceId],
+    );
+    if (
+      Number(capacity.rows[0]?.members ?? 0) >=
+      (capacity.rows[0]?.member_limit ?? 0)
+    )
+      throw new ConflictException("Workspace member entitlement reached");
   }
 
   async createProject(
