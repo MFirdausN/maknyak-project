@@ -84,6 +84,7 @@ services:
       REDIS_URL: redis://redis:6379
       NATS_URL: nats://nats:4222
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-in-every-environment}
+      BILLING_WEBHOOK_SECRET: ${BILLING_WEBHOOK_SECRET:-change-this-billing-secret-in-every-environment}
     init: true
     ports:
       - "127.0.0.1:${WORKSPACE_HOST_PORT:-3002}:3002"

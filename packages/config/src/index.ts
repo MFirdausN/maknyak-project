@@ -85,6 +85,22 @@ export const internalServiceConfigSchema = baseSchema
     }
   });
 
+export const billingWebhookConfigSchema = baseSchema
+  .extend({ BILLING_WEBHOOK_SECRET: z.string().min(32) })
+  .superRefine((config, context) => {
+    if (
+      config.NODE_ENV === "production" &&
+      config.BILLING_WEBHOOK_SECRET ===
+        "change-this-billing-secret-in-every-environment"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["BILLING_WEBHOOK_SECRET"],
+        message: "Placeholder billing credentials are forbidden in production",
+      });
+    }
+  });
+
 interface TelemetryRequest {
   method?: string;
   originalUrl?: string;

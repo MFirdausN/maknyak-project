@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   Inject,
   Param,
@@ -27,6 +28,8 @@ import type {
   WorkspaceEntitlement,
 } from "./workspace.types";
 import { DATABASE } from "./database";
+import { billingEventSchema, verifyBillingEvent } from "./billing-webhook";
+import { billingWebhookConfigSchema } from "@maknyak/config";
 
 const createWorkspaceSchema = z.object({
   slug: z
@@ -127,6 +130,20 @@ export class WorkspaceController {
       input.minimumRole,
       input.projectId,
     );
+  }
+
+  @Post("/internal/billing/events")
+  billingEvent(
+    @Headers("x-billing-signature") signature: string | undefined,
+    @Body() body: unknown,
+  ) {
+    const event = parse(billingEventSchema, body);
+    verifyBillingEvent(
+      event,
+      signature,
+      billingWebhookConfigSchema.parse(process.env).BILLING_WEBHOOK_SECRET,
+    );
+    return this.workspaces.applyBillingEvent(event);
   }
 
   @Post("/workspaces")

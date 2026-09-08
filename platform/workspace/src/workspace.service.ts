@@ -20,6 +20,7 @@ import type {
   WorkspaceEntitlement,
   WorkspaceRole,
 } from "./workspace.types";
+import type { BillingEvent } from "./billing-webhook";
 
 interface AuditEventRow {
   id: string;
@@ -229,6 +230,98 @@ export class WorkspaceService {
       if (isUniqueViolation(error))
         throw new ConflictException("A subscription change is already pending");
       throw error;
+    }
+  }
+
+  async applyBillingEvent(event: BillingEvent) {
+    const payloadHash = createHash("sha256")
+      .update(JSON.stringify(event))
+      .digest("hex");
+    const client = await this.database.connect();
+    try {
+      await client.query("BEGIN");
+      const inserted = await client.query(
+        `INSERT INTO workspace.billing_events
+         (provider, event_id, event_type, workspace_id, plan_key, payload_hash, occurred_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (provider, event_id) DO NOTHING RETURNING event_id`,
+        [
+          event.provider,
+          event.eventId,
+          event.type,
+          event.workspaceId,
+          event.planKey,
+          payloadHash,
+          event.occurredAt,
+        ],
+      );
+      if (inserted.rowCount === 0) {
+        const existing = await client.query<{ payload_hash: string }>(
+          `SELECT payload_hash FROM workspace.billing_events
+           WHERE provider = $1 AND event_id = $2`,
+          [event.provider, event.eventId],
+        );
+        if (existing.rows[0]?.payload_hash !== payloadHash)
+          throw new ConflictException(
+            "Billing event ID was reused with different content",
+          );
+        await client.query("COMMIT");
+        return { eventId: event.eventId, status: "duplicate" as const };
+      }
+
+      const pending = await client.query<{ id: string; requested_by: string }>(
+        `SELECT id, requested_by FROM workspace.subscription_changes
+         WHERE workspace_id = $1 AND requested_plan = $2 AND status = 'pending'
+         FOR UPDATE`,
+        [event.workspaceId, event.planKey],
+      );
+      const change = pending.rows[0];
+      if (!change)
+        throw new ConflictException("No matching pending subscription change");
+
+      await client.query(
+        `UPDATE workspace.entitlements
+         SET plan_key = $2, status = 'active', updated_at = now()
+         WHERE workspace_id = $1`,
+        [event.workspaceId, event.planKey],
+      );
+      await client.query(
+        `UPDATE workspace.subscription_changes
+         SET status = 'applied', resolved_at = now(), resolved_by_provider = $2, resolved_by_event_id = $3
+         WHERE id = $1`,
+        [change.id, event.provider, event.eventId],
+      );
+      await this.audit(
+        client,
+        event.workspaceId,
+        change.requested_by,
+        "subscription.activated",
+        "subscription_change",
+        change.id,
+        {
+          planKey: event.planKey,
+          provider: event.provider,
+          eventId: event.eventId,
+        },
+      );
+      await this.outbox(
+        client,
+        "workspace.subscription.activated.v1",
+        event.workspaceId,
+        {
+          workspaceId: event.workspaceId,
+          planKey: event.planKey,
+          provider: event.provider,
+          eventId: event.eventId,
+        },
+      );
+      await client.query("COMMIT");
+      return { eventId: event.eventId, status: "applied" as const };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
   }
 
