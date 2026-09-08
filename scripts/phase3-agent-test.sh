@@ -7,6 +7,8 @@ oidc_token() { curl --fail --silent --show-error -X POST "http://localhost:${key
 request() { local token="$1" method="$2" path="$3" body="${4:-}"; local args=(--fail-with-body --silent --show-error -X "$method" -H "authorization: Bearer ${token}" -H 'content-type: application/json' -H 'x-request-id: phase3-agent-test' -H 'traceparent: 00-33333333333333333333333333333333-4444444444444444-01'); [[ -z "$body" ]] || args+=(--data "$body"); curl "${args[@]}" "http://localhost:${gateway_port}/api/v1${path}"; }
 status() { local token="$1" method="$2" path="$3"; curl --silent --output /dev/null --write-out '%{http_code}' -X "$method" -H "authorization: Bearer ${token}" "http://localhost:${gateway_port}/api/v1${path}"; }
 wait_status() { local token="$1" job="$2" expected="$3"; for _ in {1..20}; do local payload current; payload="$(request "$token" GET "/ai/agent-jobs/${job}")"; current="$(json_field status <<<"$payload")"; [[ "$current" == "$expected" ]] && { printf '%s' "$payload"; return 0; }; sleep 1; done; echo "job ${job} did not reach ${expected}" >&2; return 1; }
+restore_worker_scale() { docker compose up -d --scale agent-worker=1 agent-worker >/dev/null 2>&1 || true; }
+trap restore_worker_scale EXIT
 
 gateway_port="$(compose_port gateway 3000)"; keycloak_port="$(compose_port keycloak 8080)"
 owner_token="$(oidc_token developer maknyak-dev)"; outsider_token="$(oidc_token collaborator maknyak-collaborator)"
