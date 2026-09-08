@@ -101,6 +101,38 @@ export const billingWebhookConfigSchema = baseSchema
     }
   });
 
+export const paymentProviderConfigSchema = baseSchema
+  .extend({
+    PAYMENT_PROVIDER: z.enum(["disabled", "midtrans"]).default("disabled"),
+    MIDTRANS_ENVIRONMENT: z.enum(["sandbox", "production"]).default("sandbox"),
+    MIDTRANS_SERVER_KEY: z.string().min(1).optional(),
+    PAYMENT_FINISH_URL: z.string().url().optional(),
+  })
+  .superRefine((config, context) => {
+    if (config.PAYMENT_PROVIDER !== "midtrans") return;
+    if (!config.MIDTRANS_SERVER_KEY)
+      context.addIssue({
+        code: "custom",
+        path: ["MIDTRANS_SERVER_KEY"],
+        message: "Required when Midtrans is enabled",
+      });
+    if (!config.PAYMENT_FINISH_URL)
+      context.addIssue({
+        code: "custom",
+        path: ["PAYMENT_FINISH_URL"],
+        message: "Required when Midtrans is enabled",
+      });
+    if (
+      config.NODE_ENV === "production" &&
+      config.MIDTRANS_ENVIRONMENT !== "production"
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["MIDTRANS_ENVIRONMENT"],
+        message: "Production must not use Midtrans sandbox",
+      });
+  });
+
 interface TelemetryRequest {
   method?: string;
   originalUrl?: string;

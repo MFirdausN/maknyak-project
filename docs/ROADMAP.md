@@ -60,7 +60,9 @@ Exit: agent menghemat waktu pengguna secara konsisten tanpa melanggar safety bou
 - [x] Tenant-scoped commercial usage summary dengan limit, remaining quota, dan dashboard auto-sync.
 - [x] Concurrent-safe downgrade request, member-capacity guard, dan signed cancellation event.
 - [x] Owner-only billing history dengan pagination, lazy loading, dan auto-sync.
-- Checkout adapter nyata dan privileged support/admin tooling.
+- [x] Disabled-by-default payment boundary, Midtrans Snap scaffold, notification verifier, dan checkout persistence.
+- Aktivasi Midtrans setelah harga, merchant credential, callback HTTPS, dan mode checkout diputuskan.
+- Privileged support/admin tooling.
 - Produk SaaS pertama, onboarding, analytics, dan feedback loop.
 - SLO, backup/restore drill, incident response, dan cost controls.
 
