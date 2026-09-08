@@ -17,6 +17,7 @@ import type {
   InvitationStatus,
   Project,
   Workspace,
+  WorkspaceEntitlement,
   WorkspaceRole,
 } from "./workspace.types";
 
@@ -58,6 +59,16 @@ interface InvitationRow {
   expires_at: Date;
   created_at: Date;
 }
+interface EntitlementRow {
+  workspace_id: string;
+  plan_key: "free" | "team";
+  display_name: string;
+  status: "active" | "past_due" | "cancelled";
+  member_limit: number;
+  daily_agent_job_limit: number;
+  retention_days: number;
+  updated_at: Date;
+}
 
 @Injectable()
 export class WorkspaceService {
@@ -91,6 +102,10 @@ export class WorkspaceService {
       await client.query(
         `INSERT INTO workspace.memberships (workspace_id, principal_id, role) VALUES ($1, $2, 'owner')`,
         [row.id, principalId],
+      );
+      await client.query(
+        `INSERT INTO workspace.entitlements (workspace_id, plan_key) VALUES ($1, 'free')`,
+        [row.id],
       );
       await this.outbox(client, "workspace.workspace.created.v1", row.id, {
         workspaceId: row.id,
@@ -130,6 +145,7 @@ export class WorkspaceService {
     workspaceId: string;
     principalId: string;
     role: WorkspaceRole;
+    entitlements: WorkspaceEntitlement;
   }> {
     const role = await this.role(principalId, workspaceId);
     requireRole(role, minimumRole);
@@ -142,7 +158,42 @@ export class WorkspaceService {
         throw new NotFoundException("Project not found in workspace");
     }
     if (!role) throw new NotFoundException("Workspace membership not found");
-    return { workspaceId, principalId, role };
+    return {
+      workspaceId,
+      principalId,
+      role,
+      entitlements: await this.entitlementRow(workspaceId),
+    };
+  }
+
+  async entitlement(
+    principalId: string,
+    workspaceId: string,
+  ): Promise<WorkspaceEntitlement> {
+    requireRole(await this.role(principalId, workspaceId), "viewer");
+    return this.entitlementRow(workspaceId);
+  }
+
+  private async entitlementRow(
+    workspaceId: string,
+  ): Promise<WorkspaceEntitlement> {
+    const result = await this.database.query<EntitlementRow>(
+      `SELECT e.workspace_id, e.plan_key, p.display_name, e.status, p.member_limit, p.daily_agent_job_limit, p.retention_days, e.updated_at
+       FROM workspace.entitlements e JOIN workspace.plan_catalog p USING (plan_key) WHERE e.workspace_id = $1`,
+      [workspaceId],
+    );
+    const row = result.rows[0];
+    if (!row) throw new NotFoundException("Workspace entitlement not found");
+    return {
+      workspaceId: row.workspace_id,
+      planKey: row.plan_key,
+      displayName: row.display_name,
+      status: row.status,
+      memberLimit: row.member_limit,
+      dailyAgentJobLimit: row.daily_agent_job_limit,
+      retentionDays: row.retention_days,
+      updatedAt: row.updated_at.toISOString(),
+    };
   }
 
   async addMember(

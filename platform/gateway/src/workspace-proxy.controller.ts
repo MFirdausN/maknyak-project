@@ -199,6 +199,20 @@ export class WorkspaceProxyController {
     );
   }
 
+  @Get("/:workspaceId/entitlements")
+  entitlements(
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @CurrentRequestId() requestId: string,
+    @Param("workspaceId", new ParseUUIDPipe()) workspaceId: string,
+  ): Promise<unknown> {
+    return this.forward(
+      `/${workspaceId}/entitlements`,
+      "GET",
+      principal.id,
+      requestId,
+    );
+  }
+
   @Get("/:workspaceId/audit")
   audit(
     @CurrentPrincipal() principal: AuthenticatedPrincipal,

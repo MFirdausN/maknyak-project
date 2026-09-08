@@ -3,6 +3,7 @@ import {
   BadGatewayException,
   ConflictException,
   ForbiddenException,
+  HttpException,
   Inject,
   Injectable,
   NotFoundException,
@@ -68,8 +69,21 @@ export class AgentService {
     agentKey: AgentKey,
     traceId?: string,
   ) {
-    await this.authorize(principalId, workspaceId, "member");
-    const retention = await this.retentionDays(workspaceId);
+    const authorization = await this.authorize(
+      principalId,
+      workspaceId,
+      "member",
+    );
+    const used = await this.database.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM agent.jobs WHERE workspace_id = $1 AND created_at >= date_trunc('day', now())`,
+      [workspaceId],
+    );
+    if (
+      Number(used.rows[0]?.count ?? 0) >=
+      authorization.entitlements.dailyAgentJobLimit
+    )
+      throw new HttpException("Daily agent job entitlement reached", 429);
+    const retention = authorization.entitlements.retentionDays;
     const result = await this.database.query<JobRow>(
       `INSERT INTO agent.jobs (workspace_id, requested_by, agent_key, goal, trace_id, expires_at)
        VALUES ($1, $2, $3, $4, $5, now() + make_interval(days => $6)) RETURNING *`,
@@ -474,7 +488,9 @@ export class AgentService {
     principalId: string,
     workspaceId: string,
     minimumRole: string,
-  ) {
+  ): Promise<{
+    entitlements: { dailyAgentJobLimit: number; retentionDays: number };
+  }> {
     const response = await fetch(
       `${process.env.WORKSPACE_URL ?? "http://workspace:3002"}/api/v1/internal/authorize`,
       {
@@ -488,8 +504,11 @@ export class AgentService {
         signal: AbortSignal.timeout(3000),
       },
     );
+    const payload = (await response.json()) as {
+      message?: string;
+      entitlements: { dailyAgentJobLimit: number; retentionDays: number };
+    };
     if (!response.ok) {
-      const payload = (await response.json()) as { message?: string };
       if (response.status === 404)
         throw new NotFoundException(payload.message ?? "Workspace not found");
       if (response.status === 403)
@@ -500,6 +519,7 @@ export class AgentService {
         payload.message ?? "Workspace authorization failed",
       );
     }
+    return payload;
   }
 }
 

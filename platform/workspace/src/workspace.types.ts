@@ -47,3 +47,13 @@ export interface AuditEvent {
   readonly metadata: Record<string, unknown>;
   readonly occurredAt: string;
 }
+export interface WorkspaceEntitlement {
+  readonly workspaceId: string;
+  readonly planKey: "free" | "team";
+  readonly displayName: string;
+  readonly status: "active" | "past_due" | "cancelled";
+  readonly memberLimit: number;
+  readonly dailyAgentJobLimit: number;
+  readonly retentionDays: number;
+  readonly updatedAt: string;
+}

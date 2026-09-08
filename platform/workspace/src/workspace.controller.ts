@@ -24,6 +24,7 @@ import type {
   Membership,
   Project,
   Workspace,
+  WorkspaceEntitlement,
 } from "./workspace.types";
 import { DATABASE } from "./database";
 
@@ -144,6 +145,14 @@ export class WorkspaceController {
     @Param("workspaceId", new ParseUUIDPipe()) workspaceId: string,
   ): Promise<Workspace> {
     return this.workspaces.get(principalId, workspaceId);
+  }
+
+  @Get("/workspaces/:workspaceId/entitlements")
+  entitlement(
+    @PrincipalId() principalId: string,
+    @Param("workspaceId", new ParseUUIDPipe()) workspaceId: string,
+  ): Promise<WorkspaceEntitlement> {
+    return this.workspaces.entitlement(principalId, workspaceId);
   }
 
   @Post("/workspaces/:workspaceId/members")

@@ -54,7 +54,8 @@ Exit: agent menghemat waktu pengguna secara konsisten tanpa melanggar safety bou
 
 ## Phase 4 — Commercial product
 
-- Entitlements, metering, billing, support/admin tooling.
+- [x] Provider-neutral workspace plan catalog, entitlement visibility, dan server-side daily agent limit.
+- Payment provider, subscription lifecycle, usage ledger, dan support/admin tooling.
 - Produk SaaS pertama, onboarding, analytics, dan feedback loop.
 - SLO, backup/restore drill, incident response, dan cost controls.
 

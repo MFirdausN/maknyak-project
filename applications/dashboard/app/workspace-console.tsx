@@ -46,6 +46,14 @@ interface Membership {
   principalId: string;
   role: Workspace["role"];
 }
+interface Entitlement {
+  planKey: string;
+  displayName: string;
+  status: string;
+  memberLimit: number;
+  dailyAgentJobLimit: number;
+  retentionDays: number;
+}
 
 interface Toast {
   kind: "success" | "error";
@@ -60,6 +68,7 @@ export function WorkspaceConsole() {
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [members, setMembers] = useState<Membership[]>([]);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
 
   const showSuccess = useCallback((message: string) => {
     setToast({ kind: "success", message });
@@ -77,8 +86,15 @@ export function WorkspaceConsole() {
   }, []);
 
   useEffect(() => {
-    if (selected) void loadMembers(selected.id);
-    else setMembers([]);
+    if (selected) {
+      void loadMembers(selected.id);
+      void api<Entitlement>(`/api/workspaces/${selected.id}/entitlements`)
+        .then(setEntitlement)
+        .catch(showError);
+    } else {
+      setMembers([]);
+      setEntitlement(null);
+    }
   }, [selected]);
 
   useEffect(() => {
@@ -378,6 +394,17 @@ export function WorkspaceConsole() {
                     <code>{selected.id}</code>
                   </div>
                   <div className="forms-grid">
+                    {entitlement && (
+                      <div className="entitlement-card">
+                        <small>PLAN · {entitlement.status}</small>
+                        <h3>{entitlement.displayName}</h3>
+                        <span>
+                          {entitlement.memberLimit} anggota ·{" "}
+                          {entitlement.dailyAgentJobLimit} agent job/hari ·
+                          retensi {entitlement.retentionDays} hari
+                        </span>
+                      </div>
+                    )}
                     <form onSubmit={createProject}>
                       <h3>Project baru</h3>
                       <label>

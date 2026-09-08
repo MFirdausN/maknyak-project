@@ -321,6 +321,19 @@ button:disabled {
   grid-column: 1 / -1;
   margin-top: 1rem;
 }
+.entitlement-card {
+  grid-column: 1 / -1;
+  border: 1px solid var(--line);
+  padding: 14px;
+}
+.entitlement-card h3 {
+  margin: 4px 0;
+}
+.entitlement-card span,
+.entitlement-card small {
+  color: var(--muted);
+  font: 11px monospace;
+}
 
 .member-row {
   display: grid;
