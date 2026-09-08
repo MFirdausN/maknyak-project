@@ -30,3 +30,8 @@ konkuren.
 `make phase4-test` juga mensimulasikan event payment: signature salah ditolak,
 event valid mengaktifkan Team, pengiriman ulang tidak menerapkan perubahan dua
 kali, dan limit Team langsung digunakan oleh service AI.
+
+Ringkasan penggunaan pada dashboard tersinkron otomatis setiap sepuluh detik.
+Kartu usage menampilkan job agent hari ini, limit plan aktif, sisa kuota, token,
+biaya provider, dan aktivitas generasi brief. Semua nilai dihitung server-side
+setelah tenant authorization.

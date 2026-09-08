@@ -52,6 +52,10 @@ export interface UsageSummary {
   dailyTokenLimit: number;
   costMicrousdToday: number;
   dailyCostMicrousd: number;
+  agentJobsToday: number;
+  dailyAgentJobLimit: number;
+  agentJobsRemaining: number;
+  agentUsagePercent: number;
 }
 
 export interface GenerateBriefInput {

@@ -34,6 +34,10 @@ interface UsageSummary {
   dailyTokenLimit: number;
   costMicrousdToday: number;
   dailyCostMicrousd: number;
+  agentJobsToday: number;
+  dailyAgentJobLimit: number;
+  agentJobsRemaining: number;
+  agentUsagePercent: number;
 }
 
 interface BriefPage {
@@ -194,21 +198,40 @@ export function ProjectBriefPanel({
         <span>{data?.total ?? 0} brief</span>
       </div>
       {usage && (
-        <div className="usage-meter" aria-label="Pemakaian AI hari ini">
-          <span>
-            {usage.runsToday}/{usage.dailyRunLimit} generasi hari ini
-          </span>
-          <span>
-            {usage.running}/{usage.maxConcurrentRuns} sedang berjalan
-          </span>
-          <span>Retensi {usage.retentionDays} hari</span>
-          <span>
-            {usage.tokensToday}/{usage.dailyTokenLimit} token
-          </span>
-          <span>
-            US${(usage.costMicrousdToday / 1_000_000).toFixed(4)} / US$
-            {(usage.dailyCostMicrousd / 1_000_000).toFixed(2)}
-          </span>
+        <div
+          className="usage-summary"
+          aria-label="Pemakaian workspace hari ini"
+        >
+          <div className="usage-progress">
+            <div>
+              <strong>Agent usage</strong>
+              <small>
+                {usage.agentJobsToday}/{usage.dailyAgentJobLimit} job ·{" "}
+                {usage.agentJobsRemaining} tersisa
+              </small>
+            </div>
+            <progress
+              value={usage.agentUsagePercent}
+              max={100}
+              aria-label={`${usage.agentUsagePercent}% limit agent terpakai`}
+            />
+          </div>
+          <div className="usage-meter">
+            <span>
+              {usage.runsToday}/{usage.dailyRunLimit} generasi hari ini
+            </span>
+            <span>
+              {usage.running}/{usage.maxConcurrentRuns} sedang berjalan
+            </span>
+            <span>Retensi {usage.retentionDays} hari</span>
+            <span>
+              {usage.tokensToday}/{usage.dailyTokenLimit} token
+            </span>
+            <span>
+              US${(usage.costMicrousdToday / 1_000_000).toFixed(4)} / US$
+              {(usage.dailyCostMicrousd / 1_000_000).toFixed(2)}
+            </span>
+          </div>
         </div>
       )}
       <form onSubmit={generate} className="brief-form">

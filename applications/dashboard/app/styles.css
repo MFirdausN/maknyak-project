@@ -563,6 +563,32 @@ button.danger {
   margin: 0.75rem 0;
 }
 
+.usage-summary {
+  margin: 0.9rem 0;
+}
+
+.usage-progress {
+  align-items: center;
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: minmax(140px, 1fr) minmax(160px, 2fr);
+}
+
+.usage-progress div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.usage-progress small {
+  color: var(--muted);
+}
+
+.usage-progress progress {
+  accent-color: var(--accent);
+  height: 0.55rem;
+  width: 100%;
+}
+
 .usage-meter span {
   border: 1px solid var(--line);
   border-radius: 999px;

@@ -103,7 +103,11 @@ export class BriefService {
   }
 
   async usage(principalId: string, workspaceId: string): Promise<UsageSummary> {
-    await this.authorize(principalId, workspaceId, "viewer");
+    const authorization = await this.authorize(
+      principalId,
+      workspaceId,
+      "viewer",
+    );
     const result = await this.database.query<{
       runs_today: string;
       running: string;
@@ -114,6 +118,7 @@ export class BriefService {
       cost_today: string;
       daily_token_limit: number;
       daily_cost_microusd: string;
+      agent_jobs_today: string;
     }>(
       `SELECT
         count(r.id) FILTER (WHERE r.created_at >= date_trunc('day', now()))::text AS runs_today,
@@ -127,6 +132,9 @@ export class BriefService {
           + (SELECT COALESCE(sum(cost_microusd), 0) FROM ai.messages WHERE workspace_id = $1 AND created_at >= date_trunc('day', now())))::text AS cost_today
         ,COALESCE(l.daily_token_limit, 100000) AS daily_token_limit
         ,COALESCE(l.daily_cost_microusd, 1000000)::text AS daily_cost_microusd
+        ,(SELECT COALESCE(sum(quantity), 0)::text FROM agent.usage_events
+          WHERE workspace_id = $1 AND metric = 'agent.job.created'
+            AND occurred_at >= date_trunc('day', now())) AS agent_jobs_today
       FROM (SELECT $1::uuid AS workspace_id) w
       LEFT JOIN ai.workspace_limits l USING (workspace_id)
       LEFT JOIN ai.runs r USING (workspace_id)
@@ -134,6 +142,8 @@ export class BriefService {
       [workspaceId],
     );
     const row = result.rows[0]!;
+    const agentJobsToday = Number(row.agent_jobs_today);
+    const dailyAgentJobLimit = authorization.entitlements.dailyAgentJobLimit;
     return {
       runsToday: Number(row.runs_today),
       dailyRunLimit: row.daily_run_limit,
@@ -144,6 +154,13 @@ export class BriefService {
       dailyTokenLimit: row.daily_token_limit,
       costMicrousdToday: Number(row.cost_today),
       dailyCostMicrousd: Number(row.daily_cost_microusd),
+      agentJobsToday,
+      dailyAgentJobLimit,
+      agentJobsRemaining: Math.max(0, dailyAgentJobLimit - agentJobsToday),
+      agentUsagePercent: Math.min(
+        100,
+        Math.round((agentJobsToday / dailyAgentJobLimit) * 100),
+      ),
     };
   }
 
@@ -354,7 +371,11 @@ export class BriefService {
     workspaceId: string,
     minimumRole: string,
     projectId?: string,
-  ): Promise<void> {
+  ): Promise<{
+    entitlements: {
+      dailyAgentJobLimit: number;
+    };
+  }> {
     const response = await fetch(
       `${process.env.WORKSPACE_URL ?? "http://workspace:3002"}/api/v1/internal/authorize`,
       {
@@ -384,6 +405,9 @@ export class BriefService {
         payload.message ?? "Workspace authorization failed",
       );
     }
+    return response.json() as Promise<{
+      entitlements: { dailyAgentJobLimit: number };
+    }>;
   }
 }
 

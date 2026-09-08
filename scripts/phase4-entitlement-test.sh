@@ -34,6 +34,8 @@ billing_records="$(docker compose exec -T postgres psql --tuples-only --no-align
 active="$(call GET "/workspaces/${workspace_id}/entitlements")"
 [[ "$active" == *'"planKey":"team"'* && "$active" == *'"dailyAgentJobLimit":500'* && "$active" == *'"pendingPlanKey":null'* ]] || { echo "Team entitlement was not activated: ${active}" >&2; exit 1; }
 post_upgrade_id="$(call POST /ai/agent-jobs "{\"workspaceId\":\"${workspace_id}\",\"goal\":\"This job verifies the upgraded Team usage boundary is active.\"}" | json_field id)"
+usage_summary="$(call GET "/ai/usage?workspaceId=${workspace_id}")"
+[[ "$usage_summary" == *'"agentJobsToday":26'* && "$usage_summary" == *'"dailyAgentJobLimit":500'* && "$usage_summary" == *'"agentJobsRemaining":474'* ]] || { echo "commercial usage summary is incorrect: ${usage_summary}" >&2; exit 1; }
 for id in "${ids[@]}"; do call POST "/ai/agent-jobs/${id}/cancel" '{}' >/dev/null || true; done
 call POST "/ai/agent-jobs/${post_upgrade_id}/cancel" '{}' >/dev/null || true
 echo "ok: signed idempotent billing activation upgrades enforced usage/member entitlements"
