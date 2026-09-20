@@ -43,9 +43,16 @@ make down
 make check     # lint, typecheck, test, build
 pnpm security:audit
 make smoke     # verifikasi stack Docker yang sedang berjalan
+make slo-check # sampling availability dan latency seluruh service boundary
+make cost-report # usage tenant, ukuran data, dan resource container
+make support-report WORKSPACE=<id-or-slug> SUPPORT_OPERATOR_ID=<uuid> SUPPORT_REASON='<reason>'
 make phase1-test # tenant isolation, invitation, ownership, audit, dan outbox
 make phase2-test # AI project brief, streaming, pagination, usage, dan isolation
 make phase3-test # durable agent, approval, scoped capability, dan artifact
+make phase3-load-test # antrean agent paralel dan exactly-once processing
+make phase4-test # entitlement, limit, dan lifecycle billing bertanda tangan
+make backup # PostgreSQL dan artifact MinIO; default tersimpan di .backups/
+make restore-drill BACKUP=.backups/<timestamp> # verifikasi restore terisolasi
 make disk-audit
 sudo make disk-clean
 ```
@@ -89,6 +96,10 @@ Untuk alur secure multi-tenancy terbaru, ikuti [panduan mencoba Phase 1](docs/TR
 Baseline AI Project Brief tersedia di [panduan mencoba Phase 2](docs/TRY_PHASE_2.md).
 Durable Project Planner Agent tersedia di [panduan mencoba Phase 3](docs/TRY_PHASE_3.md).
 Fondasi entitlement workspace tersedia di [panduan mencoba Phase 4](docs/TRY_PHASE_4.md).
+Prosedur backup dan pemulihan tersedia di [runbook data](docs/DATA_RECOVERY.md).
+SLO awal, alert policy, dan respons insiden tersedia di [runbook operasi](docs/OPERATIONS.md).
+Guard biaya dan kapasitas tersedia di [panduan cost controls](docs/COST_CONTROLS.md).
+Prosedur support terbatas tersedia di [runbook privileged support](docs/SUPPORT.md).
 Strategi environment dan akses contributor dijelaskan dalam [branching policy](docs/BRANCHING.md).
 
 ## Struktur

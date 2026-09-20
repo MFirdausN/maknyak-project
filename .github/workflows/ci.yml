@@ -33,7 +33,7 @@ jobs:
   integration:
     needs: quality
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       GATEWAY_HOST_PORT: 13000
       IDENTITY_HOST_PORT: 13001
@@ -48,6 +48,7 @@ jobs:
       MINIO_CONSOLE_HOST_PORT: 19001
       OIDC_ISSUER: http://localhost:18080/realms/maknyak
       INTERNAL_API_KEY: ci-integration-only-not-a-secret
+      BILLING_WEBHOOK_SECRET: ci-billing-webhook-only-not-a-secret
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build runtime image
@@ -64,10 +65,18 @@ jobs:
         run: docker compose run --rm migrate
       - name: Run end-to-end smoke test
         run: make smoke
+      - name: Verify operational SLO probe
+        run: SLO_SAMPLES=5 SLO_INTERVAL_SECONDS=0 make slo-check
       - name: Run Phase 1 tenant isolation test
         run: make phase1-test
       - name: Run Phase 2 AI project brief test
         run: make phase2-test
+      - name: Run Phase 3 durable agent test
+        run: make phase3-test
+      - name: Run Phase 3 queue load test
+        run: make phase3-load-test
+      - name: Run Phase 4 commercial entitlement test
+        run: make phase4-test
       - name: Print service logs on failure
         if: failure()
         run: docker compose logs --no-color

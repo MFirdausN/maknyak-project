@@ -62,8 +62,12 @@ Exit: agent menghemat waktu pengguna secara konsisten tanpa melanggar safety bou
 - [x] Owner-only billing history dengan pagination, lazy loading, dan auto-sync.
 - [x] Disabled-by-default payment boundary, Midtrans Snap scaffold, notification verifier, dan checkout persistence.
 - Aktivasi Midtrans setelah harga, merchant credential, callback HTTPS, dan mode checkout diputuskan.
-- Privileged support/admin tooling.
+- [x] Audited, read-only, metadata-only privileged support CLI baseline.
+- Production support IAM, approval workflow, dan narrowly scoped remediation commands.
 - Produk SaaS pertama, onboarding, analytics, dan feedback loop.
-- SLO, backup/restore drill, incident response, dan cost controls.
+- [x] Checksummed PostgreSQL/MinIO backup dan isolated restore drill.
+- [x] Preview SLO contract, automated probe, dan incident response baseline.
+- [x] Tenant AI budget, container resource ceilings, dan operational cost report.
+- Production metrics exporter/alerting, remote encrypted retention, dan cloud budget integration.
 
 Exit: pelanggan aktif membayar dan retention membenarkan investasi platform berikutnya.
