@@ -6,7 +6,9 @@ import {
 } from "@nestjs/common";
 import type { CanActivate, ExecutionContext } from "@nestjs/common";
 import { gatewayConfigSchema } from "@maknyak/config";
-import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
+import type { JWTPayload, JWTVerifyGetKey } from "jose" with {
+  "resolution-mode": "import",
+};
 
 export interface AuthenticatedPrincipal {
   id: string;
@@ -25,9 +27,7 @@ interface AuthenticatedRequest {
 @Injectable()
 export class AuthenticationGuard implements CanActivate {
   private readonly config = gatewayConfigSchema.parse(process.env);
-  private readonly jwks = createRemoteJWKSet(
-    new URL(this.config.OIDC_JWKS_URL),
-  );
+  private jwks?: JWTVerifyGetKey;
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
@@ -71,6 +71,8 @@ export class AuthenticationGuard implements CanActivate {
       throw new UnauthorizedException("Bearer token required");
     }
     try {
+      const { createRemoteJWKSet, jwtVerify } = await import("jose");
+      this.jwks ??= createRemoteJWKSet(new URL(this.config.OIDC_JWKS_URL));
       const { payload } = await jwtVerify(authorization.slice(7), this.jwks, {
         issuer: this.config.OIDC_ISSUER,
       });

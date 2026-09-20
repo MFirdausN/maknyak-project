@@ -1,6 +1,8 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
-import type { NestExpressApplication } from "@nestjs/platform-express";
+import type { NestExpressApplication } from "@nestjs/platform-express" with {
+  "resolution-mode": "import",
+};
 import {
   metricsEndpoint,
   requestTelemetry,
