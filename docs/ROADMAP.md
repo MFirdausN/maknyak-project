@@ -50,6 +50,7 @@ Exit: pengguna menyelesaikan satu pekerjaan bernilai dengan kualitas terukur. Ba
 - [x] Automated multi-instance recovery drill, worker heartbeat, dan bounded local concurrency test.
 - Validasi penggunaan nyata sebelum production.
 - [x] QA Review Agent dengan risk-based report, regression evaluation, approval gate, dan artifact MinIO.
+- [x] Optional durable Telegram delivery untuk approval, completion, dan terminal failure tanpa membawa isi pekerjaan.
 
 Exit: agent menghemat waktu pengguna secara konsisten tanpa melanggar safety boundary. Status: vertical slice pertama tersedia; validasi penggunaan nyata dan operasi production masih diperlukan.
 

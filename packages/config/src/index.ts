@@ -160,6 +160,40 @@ export const openAIConfigSchema = z.object({
     .default(1_200_000),
 });
 
+export const telegramConfigSchema = z
+  .object({
+    TELEGRAM_NOTIFICATIONS_ENABLED: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
+    TELEGRAM_BOT_TOKEN: z.string().min(20).optional(),
+    TELEGRAM_CHAT_ID: z
+      .string()
+      .regex(/^-?\d+$/)
+      .optional(),
+    TELEGRAM_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(30_000)
+      .default(10_000),
+  })
+  .superRefine((config, context) => {
+    if (!config.TELEGRAM_NOTIFICATIONS_ENABLED) return;
+    if (!config.TELEGRAM_BOT_TOKEN)
+      context.addIssue({
+        code: "custom",
+        path: ["TELEGRAM_BOT_TOKEN"],
+        message: "Required when Telegram notifications are enabled",
+      });
+    if (!config.TELEGRAM_CHAT_ID)
+      context.addIssue({
+        code: "custom",
+        path: ["TELEGRAM_CHAT_ID"],
+        message: "Required when Telegram notifications are enabled",
+      });
+  });
+
 interface TelemetryRequest {
   method?: string;
   originalUrl?: string;

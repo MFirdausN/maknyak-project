@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { AgentService } from "./agent.service";
+import { TelegramNotifier } from "./telegram-notifier";
 
 @Injectable()
 export class AgentWorker implements OnModuleInit, OnModuleDestroy {
@@ -8,7 +9,10 @@ export class AgentWorker implements OnModuleInit, OnModuleDestroy {
   private readonly workerId = `${process.env.HOSTNAME ?? "ai"}-${process.pid}`;
   private timer?: NodeJS.Timeout;
   private busy = false;
-  constructor(@Inject(AgentService) private readonly agents: AgentService) {}
+  constructor(
+    @Inject(AgentService) private readonly agents: AgentService,
+    @Inject(TelegramNotifier) private readonly telegram: TelegramNotifier,
+  ) {}
   onModuleInit() {
     void this.agents.heartbeat(this.workerId);
     void this.agents.recoverStale().then((count) => {
@@ -26,6 +30,7 @@ export class AgentWorker implements OnModuleInit, OnModuleDestroy {
     this.busy = true;
     try {
       const processed = await this.agents.processNext(this.workerId);
+      await this.telegram.flushOne();
       await this.agents.heartbeat(this.workerId, processed);
     } catch (error) {
       this.logger.error(

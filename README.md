@@ -95,6 +95,8 @@ Untuk mencoba fondasi awal, ikuti [panduan Phase 0](docs/TRY_PHASE_0.md).
 Untuk alur secure multi-tenancy terbaru, ikuti [panduan mencoba Phase 1](docs/TRY_PHASE_1.md).
 Baseline AI Project Brief tersedia di [panduan mencoba Phase 2](docs/TRY_PHASE_2.md).
 Konfigurasi provider hosted tersedia di [panduan OpenAI](docs/OPENAI_PROVIDER.md).
+Notifikasi agent opsional tersedia di [panduan Telegram](docs/TELEGRAM_NOTIFICATIONS.md).
+Status dan pekerjaan tersisa dapat diperiksa lewat [checklist validasi](docs/VALIDATION_CHECKLIST.md).
 Durable Project Planner Agent tersedia di [panduan mencoba Phase 3](docs/TRY_PHASE_3.md).
 Fondasi entitlement workspace tersedia di [panduan mencoba Phase 4](docs/TRY_PHASE_4.md).
 Prosedur backup dan pemulihan tersedia di [runbook data](docs/DATA_RECOVERY.md).
