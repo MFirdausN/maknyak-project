@@ -6,6 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { openAIConfigSchema } from "@maknyak/config";
 import type { Pool } from "pg";
 import { DATABASE } from "./database";
 import { ProviderRegistry } from "./provider";
@@ -54,10 +55,13 @@ export class BriefService {
     const result = await this.database.query<ModelRow>(
       `SELECT id, provider, provider_model, display_name FROM ai.models WHERE enabled ORDER BY id`,
     );
+    const openAIEnabled = openAIConfigSchema.safeParse(process.env).success;
     return result.rows
       .filter(
         (row) =>
-          row.provider !== "ollama" || process.env.AI_ENABLE_OLLAMA === "true",
+          (row.provider !== "ollama" ||
+            process.env.AI_ENABLE_OLLAMA === "true") &&
+          (row.provider !== "openai" || openAIEnabled),
       )
       .map((row) => ({
         id: row.id,

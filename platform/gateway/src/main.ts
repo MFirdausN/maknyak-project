@@ -1,13 +1,18 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
-import { requestTelemetry, serviceConfig } from "@maknyak/config";
+import {
+  metricsEndpoint,
+  requestTelemetry,
+  serviceConfig,
+} from "@maknyak/config";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
   const config = serviceConfig("gateway");
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.use(requestTelemetry("gateway"));
+  app.use(metricsEndpoint("gateway"));
   app.use(
     (
       _request: unknown,

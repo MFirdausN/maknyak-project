@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 
 const baseSchema = z.object({
   NODE_ENV: z
@@ -133,6 +133,33 @@ export const paymentProviderConfigSchema = baseSchema
       });
   });
 
+export const openAIConfigSchema = z.object({
+  OPENAI_API_KEY: z.string().min(20),
+  OPENAI_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
+  OPENAI_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .max(180_000)
+    .default(90_000),
+  OPENAI_MAX_OUTPUT_TOKENS: z.coerce
+    .number()
+    .int()
+    .min(256)
+    .max(16_000)
+    .default(2_400),
+  OPENAI_INPUT_PRICE_MICROUSD_PER_MILLION: z.coerce
+    .number()
+    .int()
+    .nonnegative()
+    .default(200_000),
+  OPENAI_OUTPUT_PRICE_MICROUSD_PER_MILLION: z.coerce
+    .number()
+    .int()
+    .nonnegative()
+    .default(1_200_000),
+});
+
 interface TelemetryRequest {
   method?: string;
   originalUrl?: string;
@@ -144,9 +171,152 @@ interface TelemetryResponse {
   statusCode: number;
   setHeader(name: string, value: string): void;
   once(event: "finish", listener: () => void): void;
+  end?(body?: string): void;
 }
 
 type Next = () => void;
+
+const durationBucketsMs = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
+
+interface MetricValue {
+  count: number;
+  sumMs: number;
+  buckets: number[];
+}
+
+const metrics = new Map<string, Map<string, MetricValue>>();
+
+function normalizeRoute(value: string): string {
+  const path = value.split(/[?#]/, 1)[0] || "/";
+  return path
+    .split("/")
+    .map((segment) => {
+      if (/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(segment)) return ":id";
+      if (/^\d+$/.test(segment)) return ":number";
+      return segment.length > 80 ? ":value" : segment;
+    })
+    .join("/");
+}
+
+function metricKey(method: string, route: string, statusClass: string): string {
+  return JSON.stringify([method, route, statusClass]);
+}
+
+function recordRequest(
+  service: string,
+  method: string,
+  route: string,
+  statusCode: number,
+  durationMs: number,
+): void {
+  const serviceMetrics = metrics.get(service) ?? new Map<string, MetricValue>();
+  metrics.set(service, serviceMetrics);
+  const key = metricKey(method, route, `${Math.floor(statusCode / 100)}xx`);
+  const value = serviceMetrics.get(key) ?? {
+    count: 0,
+    sumMs: 0,
+    buckets: durationBucketsMs.map(() => 0),
+  };
+  value.count += 1;
+  value.sumMs += durationMs;
+  durationBucketsMs.forEach((bucket, index) => {
+    if (durationMs <= bucket) value.buckets[index]! += 1;
+  });
+  serviceMetrics.set(key, value);
+}
+
+function label(value: string): string {
+  return value
+    .replaceAll("\\", "\\\\")
+    .replaceAll('"', '\\"')
+    .replaceAll("\n", "\\n");
+}
+
+export function renderMetrics(service: string): string {
+  const lines = [
+    "# HELP maknyak_http_requests_total Completed HTTP requests.",
+    "# TYPE maknyak_http_requests_total counter",
+  ];
+  const serviceMetrics = metrics.get(service) ?? new Map<string, MetricValue>();
+  for (const [key, value] of serviceMetrics) {
+    const [method, route, statusClass] = JSON.parse(key) as string[];
+    const labels = `service="${label(service)}",method="${label(method!)}",route="${label(route!)}",status_class="${label(statusClass!)}"`;
+    lines.push(`maknyak_http_requests_total{${labels}} ${value.count}`);
+  }
+  lines.push(
+    "# HELP maknyak_http_request_duration_ms HTTP request duration in milliseconds.",
+    "# TYPE maknyak_http_request_duration_ms histogram",
+  );
+  for (const [key, value] of serviceMetrics) {
+    const [method, route, statusClass] = JSON.parse(key) as string[];
+    const labels = `service="${label(service)}",method="${label(method!)}",route="${label(route!)}",status_class="${label(statusClass!)}"`;
+    durationBucketsMs.forEach((bucket, index) =>
+      lines.push(
+        `maknyak_http_request_duration_ms_bucket{${labels},le="${bucket}"} ${value.buckets[index]}`,
+      ),
+    );
+    lines.push(
+      `maknyak_http_request_duration_ms_bucket{${labels},le="+Inf"} ${value.count}`,
+      `maknyak_http_request_duration_ms_sum{${labels}} ${value.sumMs.toFixed(3)}`,
+      `maknyak_http_request_duration_ms_count{${labels}} ${value.count}`,
+    );
+  }
+  const memory = process.memoryUsage();
+  lines.push(
+    "# HELP maknyak_process_resident_memory_bytes Resident memory size in bytes.",
+    "# TYPE maknyak_process_resident_memory_bytes gauge",
+    `maknyak_process_resident_memory_bytes{service="${label(service)}"} ${memory.rss}`,
+    "# HELP maknyak_process_heap_used_bytes JavaScript heap used in bytes.",
+    "# TYPE maknyak_process_heap_used_bytes gauge",
+    `maknyak_process_heap_used_bytes{service="${label(service)}"} ${memory.heapUsed}`,
+    "# HELP maknyak_process_uptime_seconds Process uptime in seconds.",
+    "# TYPE maknyak_process_uptime_seconds gauge",
+    `maknyak_process_uptime_seconds{service="${label(service)}"} ${process.uptime().toFixed(3)}`,
+    "",
+  );
+  return lines.join("\n");
+}
+
+export function metricsEndpoint(service: string) {
+  return (
+    request: TelemetryRequest,
+    response: TelemetryResponse,
+    next: Next,
+  ): void => {
+    if (
+      normalizeRoute(request.originalUrl ?? request.url ?? "/") !==
+      "/api/v1/metrics"
+    ) {
+      next();
+      return;
+    }
+    const configuredToken = process.env.METRICS_TOKEN;
+    const authorization = request.headers?.authorization;
+    const suppliedToken =
+      typeof authorization === "string" && authorization.startsWith("Bearer ")
+        ? authorization.slice(7)
+        : "";
+    const configured = Buffer.from(configuredToken ?? "");
+    const supplied = Buffer.from(suppliedToken);
+    if (
+      configured.length < 16 ||
+      configured.length !== supplied.length ||
+      !timingSafeEqual(configured, supplied)
+    ) {
+      response.statusCode = 401;
+      response.setHeader("content-type", "text/plain; charset=utf-8");
+      response.end?.("Unauthorized\n");
+      return;
+    }
+    response.statusCode = 200;
+    response.setHeader(
+      "content-type",
+      "text/plain; version=0.0.4; charset=utf-8",
+    );
+    response.setHeader("cache-control", "no-store");
+    response.end?.(renderMetrics(service));
+  };
+}
 
 export function requestTelemetry(service: string) {
   return (
@@ -178,6 +348,13 @@ export function requestTelemetry(service: string) {
         Number(process.hrtime.bigint() - startedAt) / 1_000_000;
       const rawPath = request.originalUrl ?? request.url ?? "/";
       const path = rawPath.split(/[?#]/, 1)[0] || "/";
+      recordRequest(
+        service,
+        request.method ?? "UNKNOWN",
+        normalizeRoute(rawPath),
+        response.statusCode,
+        durationMs,
+      );
       process.stdout.write(
         `${JSON.stringify({
           timestamp: new Date().toISOString(),

@@ -16,6 +16,7 @@ services:
       OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://keycloak:8080/realms/maknyak/protocol/openid-connect/certs}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-maknyak-cli}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-in-every-environment}
+      METRICS_TOKEN: ${METRICS_TOKEN:-local-metrics-only-not-a-secret}
     init: true
     ports:
       - "127.0.0.1:${GATEWAY_HOST_PORT:-3000}:3000"
@@ -54,6 +55,7 @@ services:
       REDIS_URL: redis://redis:6379
       NATS_URL: nats://nats:4222
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-in-every-environment}
+      METRICS_TOKEN: ${METRICS_TOKEN:-local-metrics-only-not-a-secret}
     init: true
     ports:
       - "127.0.0.1:${IDENTITY_HOST_PORT:-3001}:3001"
@@ -89,6 +91,7 @@ services:
       NATS_URL: nats://nats:4222
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-in-every-environment}
       BILLING_WEBHOOK_SECRET: ${BILLING_WEBHOOK_SECRET:-change-this-billing-secret-in-every-environment}
+      METRICS_TOKEN: ${METRICS_TOKEN:-local-metrics-only-not-a-secret}
     init: true
     ports:
       - "127.0.0.1:${WORKSPACE_HOST_PORT:-3002}:3002"
@@ -128,6 +131,13 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-maknyak}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-maknyak_local_secret}
       AGENT_ARTIFACT_BUCKET: ${AGENT_ARTIFACT_BUCKET:-maknyak-agent-artifacts}
+      METRICS_TOKEN: ${METRICS_TOKEN:-local-metrics-only-not-a-secret}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_TIMEOUT_MS: ${OPENAI_TIMEOUT_MS:-90000}
+      OPENAI_MAX_OUTPUT_TOKENS: ${OPENAI_MAX_OUTPUT_TOKENS:-2400}
+      OPENAI_INPUT_PRICE_MICROUSD_PER_MILLION: ${OPENAI_INPUT_PRICE_MICROUSD_PER_MILLION:-200000}
+      OPENAI_OUTPUT_PRICE_MICROUSD_PER_MILLION: ${OPENAI_OUTPUT_PRICE_MICROUSD_PER_MILLION:-1200000}
     init: true
     ports:
       - "127.0.0.1:${AI_HOST_PORT:-3004}:3004"

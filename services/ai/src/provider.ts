@@ -1,4 +1,5 @@
 import { Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { openAIConfigSchema } from "@maknyak/config";
 import type { BriefResult, GenerateBriefInput } from "./brief.types";
 import { z } from "zod";
 
@@ -12,6 +13,31 @@ const briefResultSchema = z.object({
   acceptanceCriteria: z.array(z.string().min(1)).min(1),
   nextSteps: z.array(z.string().min(1)).min(1),
 });
+
+const briefJsonSchema = {
+  type: "object",
+  properties: {
+    summary: { type: "string" },
+    targetUsers: { type: "array", items: { type: "string" } },
+    goals: { type: "array", items: { type: "string" } },
+    inScope: { type: "array", items: { type: "string" } },
+    outOfScope: { type: "array", items: { type: "string" } },
+    risks: { type: "array", items: { type: "string" } },
+    acceptanceCriteria: { type: "array", items: { type: "string" } },
+    nextSteps: { type: "array", items: { type: "string" } },
+  },
+  required: [
+    "summary",
+    "targetUsers",
+    "goals",
+    "inScope",
+    "outOfScope",
+    "risks",
+    "acceptanceCriteria",
+    "nextSteps",
+  ],
+  additionalProperties: false,
+} as const;
 
 export interface BriefProvider {
   generate(
@@ -31,7 +57,119 @@ export class ProviderRegistry {
   provider(name: string, providerModel: string): BriefProvider {
     if (name === "deterministic") return new DeterministicProvider();
     if (name === "ollama") return new OllamaProvider(providerModel);
+    if (name === "openai") {
+      const config = openAIConfigSchema.safeParse(process.env);
+      if (!config.success)
+        throw new ServiceUnavailableException(
+          "OpenAI provider is not configured",
+        );
+      return new OpenAIProvider(providerModel, config.data);
+    }
     throw new ServiceUnavailableException(`AI provider ${name} is unavailable`);
+  }
+}
+
+interface OpenAIProviderConfig {
+  OPENAI_API_KEY: string;
+  OPENAI_BASE_URL: string;
+  OPENAI_TIMEOUT_MS: number;
+  OPENAI_MAX_OUTPUT_TOKENS: number;
+  OPENAI_INPUT_PRICE_MICROUSD_PER_MILLION: number;
+  OPENAI_OUTPUT_PRICE_MICROUSD_PER_MILLION: number;
+}
+
+interface OpenAIResponse {
+  output?: Array<{
+    type?: string;
+    content?: Array<{ type?: string; text?: string; refusal?: string }>;
+  }>;
+  usage?: { input_tokens?: number; output_tokens?: number };
+}
+
+export class OpenAIProvider implements BriefProvider {
+  constructor(
+    private readonly model: string,
+    private readonly config: OpenAIProviderConfig,
+  ) {}
+
+  async generate(
+    input: GenerateBriefInput,
+    prompt: string,
+    onChunk?: (chunk: string) => void,
+  ): Promise<ProviderResult> {
+    const response = await fetch(`${this.config.OPENAI_BASE_URL}/responses`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${this.config.OPENAI_API_KEY}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: this.model,
+        store: false,
+        max_output_tokens: this.config.OPENAI_MAX_OUTPUT_TOKENS,
+        input: [
+          { role: "developer", content: prompt },
+          {
+            role: "user",
+            content: `Title: ${input.title}\nIdea: ${input.idea}`,
+          },
+        ],
+        text: {
+          format: {
+            type: "json_schema",
+            name: "maknyak_project_brief",
+            strict: true,
+            schema: briefJsonSchema,
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(this.config.OPENAI_TIMEOUT_MS),
+    });
+    if (!response.ok)
+      throw new ServiceUnavailableException(
+        `OpenAI request failed with status ${response.status}`,
+      );
+    const payload = (await response.json()) as OpenAIResponse;
+    const content = payload.output
+      ?.find((item) => item.type === "message")
+      ?.content?.find((item) => item.type === "output_text")?.text;
+    if (!content)
+      throw new ServiceUnavailableException(
+        "OpenAI returned no structured output",
+      );
+    const parsed = briefResultSchema.safeParse(safeJson(content));
+    if (!parsed.success)
+      throw new ServiceUnavailableException(
+        "OpenAI structured output failed validation",
+      );
+    const result = parsed.data;
+    onChunk?.(content);
+    const inputTokens =
+      payload.usage?.input_tokens ??
+      estimateTokens(`${prompt}\n${input.title}\n${input.idea}`);
+    const outputTokens =
+      payload.usage?.output_tokens ?? estimateTokens(content);
+    return {
+      result,
+      usage: {
+        inputTokens,
+        outputTokens,
+        costMicrousd: Math.ceil(
+          (inputTokens * this.config.OPENAI_INPUT_PRICE_MICROUSD_PER_MILLION +
+            outputTokens *
+              this.config.OPENAI_OUTPUT_PRICE_MICROUSD_PER_MILLION) /
+            1_000_000,
+        ),
+      },
+    };
+  }
+}
+
+function safeJson(value: string): unknown {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return undefined;
   }
 }
 

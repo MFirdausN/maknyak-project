@@ -34,6 +34,13 @@ make slo-check
 `SLO_MAX_P95_MS` can adjust the sampling window. The script is a deployment and
 CI probe, not a replacement for a production time-series backend.
 
+Gateway, Identity, Workspace, and AI expose Prometheus-compatible metrics at
+`/api/v1/metrics`. The endpoint requires `Authorization: Bearer <METRICS_TOKEN>`.
+Metrics contain normalized routes and status classes, never workspace,
+principal, request ID, query string, or payload labels. Production must replace
+the local token, store it in a secret manager, restrict the endpoint at the
+network layer, and rotate scraper credentials.
+
 ## Alert policy
 
 When a metrics backend is selected, alert on symptoms at the Gateway/Dashboard
@@ -90,5 +97,6 @@ the person who closes the incident. Within three business days record impact,
 timeline, contributing conditions, detection gaps, and owned follow-up actions.
 The review is blameless, but actions require an owner and due date.
 
-Production still requires a metrics backend, external probes, notification
-routing, log retention policy, on-call ownership, and tested deployment rollback.
+Production still requires a metrics scraper/backend, external probes,
+notification routing, log retention policy, on-call ownership, and tested
+deployment rollback.

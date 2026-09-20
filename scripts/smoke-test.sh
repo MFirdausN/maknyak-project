@@ -29,6 +29,27 @@ assert_health identity "$identity_port"
 assert_health workspace "$workspace_port"
 assert_health ai "$ai_port"
 
+metrics_token="$(docker compose exec -T gateway printenv METRICS_TOKEN)"
+[[ ${#metrics_token} -ge 16 ]] || { echo "metrics token is not configured" >&2; exit 1; }
+assert_metrics() {
+  local service="$1"
+  local port="$2"
+  local unauthenticated body
+  unauthenticated="$(curl --silent --output /dev/null --write-out '%{http_code}' "http://localhost:${port}/api/v1/metrics")"
+  [[ "$unauthenticated" == "401" ]] || { echo "${service} metrics without token returned ${unauthenticated}" >&2; exit 1; }
+  body="$(curl --fail --silent --show-error --header "authorization: Bearer ${metrics_token}" "http://localhost:${port}/api/v1/metrics")"
+  [[ "$body" == *'maknyak_http_requests_total'* && "$body" == *'maknyak_process_uptime_seconds'* ]] || {
+    echo "${service} metrics payload is incomplete" >&2
+    exit 1
+  }
+  echo "ok: ${service} authenticated metrics"
+}
+
+assert_metrics gateway "$gateway_port"
+assert_metrics identity "$identity_port"
+assert_metrics workspace "$workspace_port"
+assert_metrics ai "$ai_port"
+
 dashboard_status="$(curl --silent --output /dev/null --write-out '%{http_code}' "http://localhost:${dashboard_port}")"
 [[ "$dashboard_status" == "200" ]] || { echo "dashboard returned ${dashboard_status}" >&2; exit 1; }
 echo "ok: dashboard"
