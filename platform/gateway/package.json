@@ -14,7 +14,7 @@
     "@maknyak/config": "workspace:*",
     "@maknyak/contracts": "workspace:*",
     "@nestjs/common": "^11.1.6",
-    "@nestjs/core": "^11.1.6",
+    "@nestjs/core": "^12.0.4",
     "@nestjs/platform-express": "^11.1.6",
     "jose": "^6.2.12",
     "redis": "^5.12.1",
