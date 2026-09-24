@@ -22,9 +22,9 @@
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
-    "@nestjs/cli": "^12.0.0",
-    "@types/node": "^26.5.1",
-    "tsx": "^4.20.5",
-    "typescript": "5.9.3"
+    "@nestjs/cli": "^12.0.3",
+    "@types/node": "^26.6.2",
+    "tsx": "^4.23.15",
+    "typescript": "7.0.2"
   }
 }
