@@ -22,10 +22,10 @@
     "zod": "^4.1.5"
   },
   "devDependencies": {
-    "@nestjs/cli": "^12.0.0",
-    "@types/node": "^26.5.1",
+    "@nestjs/cli": "^12.0.8",
+    "@types/node": "^26.6.4",
     "@types/pg": "^8.15.5",
-    "tsx": "^4.20.5",
-    "typescript": "5.9.3"
+    "tsx": "^4.23.15",
+    "typescript": "7.0.2"
   }
 }
